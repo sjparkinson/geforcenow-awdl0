@@ -78,7 +78,7 @@ fn test_interface_name_validation() {
 /// Test callback invocation tracking.
 #[test]
 fn test_callback_tracking() {
-    use geforcenow_awdl0::monitor::{EventCallback, MonitorConfig, ProcessEvent, ProcessMonitor};
+    use geforcenow_awdl0::monitor::{EventCallback, MonitorConfig, ProcessMonitor};
 
     let call_count = Arc::new(AtomicU32::new(0));
     let call_count_clone = Arc::clone(&call_count);
