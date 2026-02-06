@@ -125,8 +125,8 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
     // Set up SIGTERM and SIGINT handlers
     // SAFETY: We're just setting an atomic bool
     unsafe {
-        libc::signal(libc::SIGTERM, handle_signal as usize);
-        libc::signal(libc::SIGINT, handle_signal as usize);
+        libc::signal(libc::SIGTERM, handle_signal as *const () as usize);
+        libc::signal(libc::SIGINT, handle_signal as *const () as usize);
     }
 
     // Store the running flag for signal handler

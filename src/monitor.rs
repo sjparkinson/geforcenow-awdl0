@@ -21,14 +21,8 @@ use tracing::{debug, info, trace, warn};
 /// Errors that can occur during process monitoring.
 #[derive(Debug, Error)]
 pub enum MonitorError {
-    #[error("failed to initialize NSWorkspace")]
-    WorkspaceInit,
-
     #[error("not running on main thread")]
     NotMainThread,
-
-    #[error("failed to register notification observer")]
-    ObserverRegistration,
 }
 
 /// Result type for monitor operations.
@@ -201,31 +195,6 @@ impl ProcessMonitor {
         );
 
         Ok(observer)
-    }
-
-    /// Check if the target application is currently running.
-    ///
-    /// This can be called from any thread.
-    pub fn is_target_running(&self) -> bool {
-        // We need to be on the main thread to access NSWorkspace
-        if MainThreadMarker::new().is_none() {
-            warn!("is_target_running called from non-main thread");
-            return false;
-        }
-
-        let workspace: Retained<NSWorkspace> =
-            unsafe { msg_send_id![objc2_app_kit::NSWorkspace::class(), sharedWorkspace] };
-        let running_apps = unsafe { workspace.runningApplications() };
-
-        for app in &*running_apps {
-            if let Some(bundle_id) = get_bundle_identifier(&app) {
-                if bundle_id == self.config.target_bundle_id {
-                    return true;
-                }
-            }
-        }
-
-        false
     }
 }
 

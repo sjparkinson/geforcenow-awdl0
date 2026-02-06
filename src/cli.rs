@@ -11,10 +11,6 @@ use thiserror::Error;
 #[cfg(target_os = "macos")]
 use tracing::{debug, info, warn};
 
-/// The name of the daemon binary.
-#[cfg(target_os = "macos")]
-pub const DAEMON_NAME: &str = "geforcenow-awdl0";
-
 /// The installation path for the binary.
 #[cfg(target_os = "macos")]
 pub const INSTALL_PATH: &str = "/usr/local/bin/geforcenow-awdl0";
@@ -48,9 +44,6 @@ pub enum CliError {
 
     #[error("failed to remove file: {0}")]
     RemoveFile(std::io::Error),
-
-    #[error("daemon not installed")]
-    NotInstalled,
 
     #[error("failed to get current executable path: {0}")]
     CurrentExe(std::io::Error),
