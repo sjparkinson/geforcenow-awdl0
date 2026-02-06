@@ -191,7 +191,7 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
 
     // Run the main loop
     // We use NSRunLoop to process Cocoa notifications
-    let run_loop = NSRunLoop::mainRunLoop(mtm);
+    let run_loop = NSRunLoop::mainRunLoop();
 
     while running.load(Ordering::SeqCst) {
         // Run the loop for a short interval, then check if we should exit
