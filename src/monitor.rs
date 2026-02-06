@@ -7,13 +7,13 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use block2::RcBlock;
-use objc2::msg_send_id;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
+use objc2::{msg_send, msg_send_id};
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::{
-    MainThreadMarker, NSNotification, NSNotificationCenter, NSNotificationName, NSObjectProtocol,
-    NSOperationQueue, NSString,
+    MainThreadMarker, NSNotification, NSNotificationCenter, NSObjectProtocol, NSOperationQueue,
+    NSString,
 };
 use thiserror::Error;
 use tracing::{debug, info, trace, warn};
@@ -97,7 +97,7 @@ impl ProcessMonitor {
     /// Returns an error if not called from the main thread or if notification
     /// registration fails.
     pub fn start(&self) -> Result<()> {
-        let mtm = MainThreadMarker::new().ok_or(MonitorError::NotMainThread)?;
+        let _mtm = MainThreadMarker::new().ok_or(MonitorError::NotMainThread)?;
 
         info!(
             bundle_id = %self.config.target_bundle_id,
@@ -105,7 +105,8 @@ impl ProcessMonitor {
         );
 
         // Get the shared workspace
-        let workspace = NSWorkspace::sharedWorkspace(mtm);
+        let workspace: Retained<NSWorkspace> =
+            unsafe { msg_send_id![objc2_app_kit::NSWorkspace::class(), sharedWorkspace] };
 
         // Check if target is already running
         self.check_running_applications(&workspace);
@@ -148,19 +149,17 @@ impl ProcessMonitor {
     fn register_notifications(&self, workspace: &NSWorkspace) -> Result<()> {
         let notification_center = unsafe { workspace.notificationCenter() };
 
+        // Get notification names - these are NSString constants
+        let launch_name = NSString::from_str("NSWorkspaceDidLaunchApplicationNotification");
+        let terminate_name = NSString::from_str("NSWorkspaceDidTerminateApplicationNotification");
+
         // Register for launch notifications
-        let launch_observer = self.register_notification(
-            &notification_center,
-            unsafe { NSWorkspace::didLaunchApplicationNotification() },
-            true,
-        )?;
+        let launch_observer =
+            self.register_notification(&notification_center, &launch_name, true)?;
 
         // Register for termination notifications
-        let terminate_observer = self.register_notification(
-            &notification_center,
-            unsafe { NSWorkspace::didTerminateApplicationNotification() },
-            false,
-        )?;
+        let terminate_observer =
+            self.register_notification(&notification_center, &terminate_name, false)?;
 
         self._observers
             .borrow_mut()
@@ -173,7 +172,7 @@ impl ProcessMonitor {
     fn register_notification(
         &self,
         center: &NSNotificationCenter,
-        name: &NSNotificationName,
+        name: &NSString,
         is_launch: bool,
     ) -> Result<Retained<ProtocolObject<dyn NSObjectProtocol>>> {
         let target_bundle_id = self.config.target_bundle_id.clone();
@@ -185,13 +184,15 @@ impl ProcessMonitor {
             handle_notification(notification, &target_bundle_id, &callback, is_launch);
         });
 
-        let observer = unsafe {
-            center.addObserverForName_object_queue_usingBlock(
-                Some(name),
-                None,
-                Some(&NSOperationQueue::mainQueue()),
-                &block,
-            )
+        let queue = unsafe { NSOperationQueue::mainQueue() };
+        let observer: Retained<ProtocolObject<dyn NSObjectProtocol>> = unsafe {
+            msg_send_id![
+                center,
+                addObserverForName: name,
+                object: std::ptr::null::<objc2::runtime::AnyObject>(),
+                queue: &*queue,
+                usingBlock: &*block,
+            ]
         };
 
         debug!(
@@ -212,11 +213,11 @@ impl ProcessMonitor {
             return false;
         }
 
-        let mtm = MainThreadMarker::new().unwrap();
-        let workspace = NSWorkspace::sharedWorkspace(mtm);
+        let workspace: Retained<NSWorkspace> =
+            unsafe { msg_send_id![objc2_app_kit::NSWorkspace::class(), sharedWorkspace] };
         let running_apps = unsafe { workspace.runningApplications() };
 
-        for app in running_apps {
+        for app in &*running_apps {
             if let Some(bundle_id) = get_bundle_identifier(&app) {
                 if bundle_id == self.config.target_bundle_id {
                     return true;
