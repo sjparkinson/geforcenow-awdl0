@@ -107,10 +107,10 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
-      # - name: Attest
-      #   uses: actions/attest-build-provenance@v3
-      #   with:
-      #     subject-path: '${{ github.workspace }}/target/release/geforcenow-awdl0'
+      - name: Attest
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: '${{ github.workspace }}/target/release/geforcenow-awdl0'
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v6
