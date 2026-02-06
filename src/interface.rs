@@ -10,11 +10,11 @@ use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
-/// ioctl request to get interface flags (macOS specific).
+/// `ioctl` request to get interface flags (macOS specific).
 /// Not defined in libc crate for macOS.
 const SIOCGIFFLAGS: libc::c_ulong = 0xc020_6911;
 
-/// ioctl request to set interface flags (macOS specific).
+/// `ioctl` request to set interface flags (macOS specific).
 /// Not defined in libc crate for macOS.
 const SIOCSIFFLAGS: libc::c_ulong = 0x8020_6910;
 
@@ -50,7 +50,7 @@ pub trait InterfaceController: Send + Sync {
 
     /// Allow the interface to come back up.
     ///
-    /// Note: On macOS, awdl0 is managed by the system. This doesn't force it up,
+    /// Note: On macOS, `awdl0` is managed by the system. This doesn't force it up,
     /// but removes any restrictions we've placed on it.
     fn allow_up(&self, name: &str) -> Result<()>;
 
@@ -58,7 +58,7 @@ pub trait InterfaceController: Send + Sync {
     fn is_up(&self, name: &str) -> Result<bool>;
 }
 
-/// macOS interface controller using ioctl syscalls.
+/// macOS interface controller using `ioctl` syscalls.
 pub struct MacOsInterfaceController;
 
 impl MacOsInterfaceController {
@@ -68,7 +68,7 @@ impl MacOsInterfaceController {
         Self
     }
 
-    /// Create a socket for ioctl operations.
+    /// Create a socket for `ioctl` operations.
     fn create_socket() -> Result<impl AsRawFd> {
         socket(
             AddressFamily::Inet,
@@ -81,7 +81,7 @@ impl MacOsInterfaceController {
 
     /// Validate and convert interface name to C string.
     fn validate_name(name: &str) -> Result<CString> {
-        // macOS interface names are limited to IFNAMSIZ (16) including null terminator
+        // macOS interface names are limited to `IFNAMSIZ` (16) including null terminator
         if name.len() > 15 {
             return Err(InterfaceError::NameTooLong(name.to_string()));
         }
@@ -158,7 +158,7 @@ impl InterfaceController for MacOsInterfaceController {
     }
 
     fn allow_up(&self, name: &str) -> Result<()> {
-        // For awdl0, we don't forcefully bring it up - we just ensure we're not
+        // For `awdl0`, we don't forcefully bring it up - we just ensure we're not
         // blocking it. The system will bring it up when needed (e.g., for AirDrop).
         // However, if we want to explicitly allow it, we can set the UP flag.
 
@@ -192,11 +192,11 @@ impl InterfaceController for MacOsInterfaceController {
     }
 }
 
-/// Helper module for ifreq struct manipulation.
+/// Helper module for `ifreq` struct manipulation.
 mod ifreq {
     use std::ffi::CString;
 
-    /// Create a new ifreq struct with the given interface name.
+    /// Create a new `ifreq` struct with the given interface name.
     pub fn new(name: &CString) -> libc::ifreq {
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
 

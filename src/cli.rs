@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 #[cfg(target_os = "macos")]
 pub const INSTALL_PATH: &str = "/usr/local/bin/geforcenow-awdl0";
 
-/// The path to the LaunchDaemon plist.
+/// The path to the `LaunchDaemon` plist.
 #[cfg(target_os = "macos")]
 pub const PLIST_PATH: &str = "/Library/LaunchDaemons/com.geforcenow.awdl0.plist";
 
@@ -65,8 +65,12 @@ fn check_root() -> Result<()> {
 
 /// Install the daemon.
 ///
-/// This copies the binary to the installation path, creates the LaunchDaemon
+/// This copies the binary to the installation path, creates the `LaunchDaemon`
 /// plist, and loads the daemon.
+///
+/// # Errors
+///
+/// Returns an error if not running as root, or if file operations fail.
 #[cfg(target_os = "macos")]
 pub fn install() -> Result<()> {
     check_root()?;
@@ -119,6 +123,10 @@ pub fn install() -> Result<()> {
 /// Uninstall the daemon.
 ///
 /// This unloads the daemon, removes the plist, and optionally removes the binary.
+///
+/// # Errors
+///
+/// Returns an error if not running as root, or if file operations fail.
 #[cfg(target_os = "macos")]
 pub fn uninstall() -> Result<()> {
     check_root()?;
@@ -149,6 +157,10 @@ pub fn uninstall() -> Result<()> {
 }
 
 /// Show the daemon status.
+///
+/// # Errors
+///
+/// Returns an error if launchctl command fails.
 #[cfg(target_os = "macos")]
 pub fn status() -> Result<()> {
     // Check if installed
@@ -284,7 +296,7 @@ fn is_daemon_running() -> bool {
     }
 }
 
-/// Get the current status of the awdl0 interface.
+/// Get the current status of the `awdl0` interface.
 #[cfg(target_os = "macos")]
 fn get_awdl0_status() -> Option<bool> {
     let output = Command::new("ifconfig").arg("awdl0").output().ok()?;

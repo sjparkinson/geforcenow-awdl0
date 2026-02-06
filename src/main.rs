@@ -2,7 +2,7 @@
 //! issues while gaming on `GeForce NOW`.
 //!
 //! This daemon monitors for the `GeForce NOW` application and automatically
-//! brings down the awdl0 interface when it's running, re-enabling it when
+//! brings down the `awdl0` interface when it's running, re-enabling it when
 //! `GeForce NOW` exits.
 
 #[cfg(target_os = "macos")]

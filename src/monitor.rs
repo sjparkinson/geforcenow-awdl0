@@ -1,7 +1,7 @@
-//! Process monitoring using macOS NSWorkspace notifications.
+//! Process monitoring using macOS `NSWorkspace` notifications.
 //!
 //! This module provides event-driven monitoring for application launches and
-//! terminations on macOS, using NSWorkspace notifications rather than polling.
+//! terminations on macOS, using `NSWorkspace` notifications rather than polling.
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -57,12 +57,12 @@ impl Default for MonitorConfig {
 
 /// Process monitor that watches for application launches and terminations.
 ///
-/// Uses NSWorkspace notifications for event-driven monitoring (no polling).
+/// Uses `NSWorkspace` notifications for event-driven monitoring (no polling).
 pub struct ProcessMonitor {
     config: MonitorConfig,
     callback: EventCallback,
     /// Stored observers to ensure they stay alive.
-    /// We use RefCell because observers are set up on the main thread.
+    /// We use `RefCell` because observers are set up on the main thread.
     _observers: RefCell<Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>>,
 }
 
@@ -82,7 +82,7 @@ impl ProcessMonitor {
 
     /// Start the process monitor.
     ///
-    /// This registers for NSWorkspace notifications and checks if the target
+    /// This registers for `NSWorkspace` notifications and checks if the target
     /// application is already running.
     ///
     /// Must be called from the main thread.
@@ -221,20 +221,14 @@ fn handle_notification(
         obj.map(|o| msg_send_id![&o, self])
     };
 
-    let app = match app {
-        Some(app) => app,
-        None => {
-            warn!("notification missing application object");
-            return;
-        }
+    let Some(app) = app else {
+        warn!("notification missing application object");
+        return;
     };
 
-    let bundle_id = match get_bundle_identifier(&app) {
-        Some(id) => id,
-        None => {
-            trace!("application has no bundle identifier");
-            return;
-        }
+    let Some(bundle_id) = get_bundle_identifier(&app) else {
+        trace!("application has no bundle identifier");
+        return;
     };
 
     // Check if this is the application we're interested in
@@ -258,13 +252,13 @@ fn handle_notification(
     }
 }
 
-/// Get the bundle identifier from an NSRunningApplication.
+/// Get the bundle identifier from an `NSRunningApplication`.
 fn get_bundle_identifier(app: &NSRunningApplication) -> Option<String> {
     let bundle_id: Option<Retained<NSString>> = unsafe { app.bundleIdentifier() };
     bundle_id.map(|s| s.to_string())
 }
 
-/// Get the process identifier from an NSRunningApplication.
+/// Get the process identifier from an `NSRunningApplication`.
 fn get_process_identifier(app: &NSRunningApplication) -> i32 {
     // Use msg_send since processIdentifier may not be directly exposed
     unsafe { objc2::msg_send![app, processIdentifier] }
