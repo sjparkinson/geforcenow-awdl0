@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use core_foundation::array::CFArray;
 use core_foundation::base::TCFType;
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_foundation::string::CFString;
@@ -78,12 +79,36 @@ impl InterfaceStateMonitor {
         let interface_name = self.interface.clone();
         let callback = Arc::clone(&self.callback);
 
+        // Create the callback closure for SCDynamicStore
+        let store_callback = move |_store: SCDynamicStore, changed_keys: CFArray<CFString>| {
+            trace!(
+                count = changed_keys.len(),
+                "dynamic store callback triggered"
+            );
+
+            for key in changed_keys.iter() {
+                let key_string = key.to_string();
+
+                debug!(key = %key_string, "interface state changed");
+
+                // Check if this is for our interface
+                if key_string.contains(&interface_name) {
+                    info!(
+                        interface = %interface_name,
+                        key = %key_string,
+                        "detected interface state change"
+                    );
+
+                    callback(InterfaceEvent::StateChanged {
+                        interface: interface_name.clone(),
+                    });
+                }
+            }
+        };
+
         // Create the dynamic store with a callback
         let store = SCDynamicStoreBuilder::new("geforcenow-awdl0-interface-monitor")
-            .callback_context(SCDynamicStoreCallbackContext {
-                interface: interface_name.clone(),
-                callback,
-            })
+            .callback_context(store_callback)
             .build();
 
         // Create the key pattern to watch for interface link state changes
@@ -118,44 +143,6 @@ impl InterfaceStateMonitor {
         self._store = Some(store);
 
         Ok(())
-    }
-}
-
-/// Context passed to the SCDynamicStore callback.
-struct SCDynamicStoreCallbackContext {
-    interface: String,
-    callback: InterfaceEventCallback,
-}
-
-impl system_configuration::dynamic_store::SCDynamicStoreCallBack for SCDynamicStoreCallbackContext {
-    fn changed(&self, _store: SCDynamicStore, changed_keys: core_foundation::array::CFArray) {
-        trace!(
-            count = changed_keys.len(),
-            "dynamic store callback triggered"
-        );
-
-        for i in 0..changed_keys.len() {
-            if let Some(key) = changed_keys.get(i) {
-                // The key is a CFString, get its string value
-                let key_str: CFString = unsafe { TCFType::wrap_under_get_rule(key as *const _) };
-                let key_string = key_str.to_string();
-
-                debug!(key = %key_string, "interface state changed");
-
-                // Check if this is for our interface
-                if key_string.contains(&self.interface) {
-                    info!(
-                        interface = %self.interface,
-                        key = %key_string,
-                        "detected interface state change"
-                    );
-
-                    (self.callback)(InterfaceEvent::StateChanged {
-                        interface: self.interface.clone(),
-                    });
-                }
-            }
-        }
     }
 }
 
