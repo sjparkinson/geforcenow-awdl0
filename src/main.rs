@@ -194,14 +194,12 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
 
     // Run the main loop
     // We use NSRunLoop to process Cocoa notifications
-    let run_loop = unsafe { NSRunLoop::mainRunLoop() };
+    let run_loop = NSRunLoop::mainRunLoop();
 
     while running.load(Ordering::SeqCst) {
         // Run the loop for a short interval, then check if we should exit
         // This allows us to handle signals gracefully
-        unsafe {
-            run_loop.runUntilDate(&objc2_foundation::NSDate::dateWithTimeIntervalSinceNow(1.0));
-        }
+        run_loop.runUntilDate(&objc2_foundation::NSDate::dateWithTimeIntervalSinceNow(1.0));
 
         // If GeForce NOW is running, periodically check that awdl0 is still down
         // (the system might try to bring it back up)
