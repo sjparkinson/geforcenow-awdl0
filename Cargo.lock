@@ -79,7 +79,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c132eebf10f5cad5289222520a4a058514204aed6d791f1cf4fe8088b82d15f"
 dependencies = [
- "objc2",
+ "objc2 0.5.2",
 ]
 
 [[package]]
@@ -164,7 +164,7 @@ dependencies = [
  "clap",
  "libc",
  "nix",
- "objc2",
+ "objc2 0.6.3",
  "objc2-app-kit",
  "objc2-foundation",
  "tempfile",
@@ -284,6 +284,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7c2599ce0ec54857b29ce62166b0ed9b4f6f1a70ccc9a71165b6154caca8c05"
+dependencies = [
+ "objc2-encode",
+]
+
+[[package]]
 name = "objc2-app-kit"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -292,7 +301,7 @@ dependencies = [
  "bitflags",
  "block2",
  "libc",
- "objc2",
+ "objc2 0.5.2",
  "objc2-core-data",
  "objc2-core-image",
  "objc2-foundation",
@@ -307,7 +316,7 @@ checksum = "617fbf49e071c178c0b24c080767db52958f716d9eabdf0890523aeae54773ef"
 dependencies = [
  "bitflags",
  "block2",
- "objc2",
+ "objc2 0.5.2",
  "objc2-foundation",
 ]
 
@@ -318,7 +327,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55260963a527c99f1819c4f8e3b47fe04f9650694ef348ffd2227e8196d34c80"
 dependencies = [
  "block2",
- "objc2",
+ "objc2 0.5.2",
  "objc2-foundation",
  "objc2-metal",
 ]
@@ -338,7 +347,7 @@ dependencies = [
  "bitflags",
  "block2",
  "libc",
- "objc2",
+ "objc2 0.5.2",
 ]
 
 [[package]]
@@ -349,7 +358,7 @@ checksum = "dd0cba1276f6023976a406a14ffa85e1fdd19df6b0f737b063b95f6c8c7aadd6"
 dependencies = [
  "bitflags",
  "block2",
- "objc2",
+ "objc2 0.5.2",
  "objc2-foundation",
 ]
 
@@ -361,7 +370,7 @@ checksum = "e42bee7bff906b14b167da2bac5efe6b6a07e6f7c0a21a7308d40c960242dc7a"
 dependencies = [
  "bitflags",
  "block2",
- "objc2",
+ "objc2 0.5.2",
  "objc2-foundation",
  "objc2-metal",
 ]
