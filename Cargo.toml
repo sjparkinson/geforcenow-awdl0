@@ -56,7 +56,6 @@ nix = { version = "0.31", features = ["net", "ioctl"] }
 
 # SystemConfiguration framework for interface monitoring
 system-configuration = "0.7"
-core-foundation = "0.10.1"
 
 [dev-dependencies]
 tempfile = "3"
