@@ -34,6 +34,10 @@ use monitor::{MonitorConfig, ProcessEvent, ProcessMonitor};
 #[cfg(target_os = "macos")]
 const AWDL_INTERFACE: &str = "awdl0";
 
+/// The bundle ID for GeForce NOW.
+#[cfg(target_os = "macos")]
+const GEFORCE_NOW_BUNDLE_ID: &str = "com.nvidia.gfnpc.mall";
+
 /// CLI argument parser.
 #[derive(Parser)]
 #[command(name = "geforcenow-awdl0")]
@@ -51,11 +55,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Run the daemon (typically invoked by launchd).
-    Run {
-        /// Custom bundle ID to monitor (default: com.nvidia.gfnpc.mall).
-        #[arg(long, default_value = "com.nvidia.gfnpc.mall")]
-        bundle_id: String,
-    },
+    Run,
 
     /// Install the daemon (requires root).
     Install,
@@ -85,7 +85,7 @@ fn main() {
 
     #[cfg(target_os = "macos")]
     let result: cli::Result<()> = match cli.command {
-        Commands::Run { bundle_id } => run_daemon(&bundle_id),
+        Commands::Run => run_daemon(),
         Commands::Install => cli::install(),
         Commands::Uninstall => cli::uninstall(),
         Commands::Status => {
@@ -111,10 +111,10 @@ fn main() {
 
 /// Run the daemon.
 #[cfg(target_os = "macos")]
-fn run_daemon(bundle_id: &str) -> cli::Result<()> {
+fn run_daemon() -> cli::Result<()> {
     info!(
         version = env!("CARGO_PKG_VERSION"),
-        bundle_id = bundle_id,
+        bundle_id = GEFORCE_NOW_BUNDLE_ID,
         "starting geforcenow-awdl0 daemon"
     );
 
@@ -178,7 +178,7 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
 
     // Create and start the process monitor
     let config = MonitorConfig {
-        target_bundle_id: bundle_id.to_string(),
+        target_bundle_id: GEFORCE_NOW_BUNDLE_ID.to_string(),
     };
 
     let monitor = ProcessMonitor::new(config, callback);

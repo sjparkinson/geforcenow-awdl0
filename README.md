@@ -21,17 +21,6 @@ It uses event-driven macOS APIs (NSWorkspace notifications) rather than polling,
 
 ## Installation
 
-### From Binary Release
-
-1. Download the latest binary from the [Releases](https://github.com/sjparkinson/awdl0/releases) page
-2. Run the installer:
-
-```bash
-sudo ./geforcenow-awdl0 install
-```
-
-### From Source
-
 ```bash
 # Clone the repository
 git clone https://github.com/sjparkinson/awdl0.git
@@ -84,22 +73,6 @@ ifconfig awdl0
 
 ## Configuration
 
-### Custom Application
-
-To monitor a different application, use the `--bundle-id` flag:
-
-```bash
-sudo geforcenow-awdl0 run --bundle-id "com.example.app"
-```
-
-### Logging
-
-Set the `RUST_LOG` environment variable to control log verbosity:
-
-```bash
-RUST_LOG=debug sudo geforcenow-awdl0 run
-```
-
 ## Files
 
 | Path | Description |
@@ -143,37 +116,6 @@ This will:
 3. Remove the binary from `/usr/local/bin`
 
 Log files in `/var/log/geforcenow-awdl0/` are preserved.
-
-## Building
-
-### Prerequisites
-
-- Rust 1.77 or later
-- macOS 14.0 or later (for building and running)
-
-### Development
-
-```bash
-# Check code
-cargo check
-
-# Run tests
-cargo test
-
-# Run clippy
-cargo clippy
-
-# Format code
-cargo fmt
-```
-
-### Release Build
-
-```bash
-cargo build --release
-```
-
-The binary will be at `target/release/geforcenow-awdl0`.
 
 ## License
 
