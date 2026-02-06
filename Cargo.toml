@@ -48,7 +48,7 @@ objc2-app-kit = { version = "0.2", features = [
 
 # System interfaces
 libc = "0.2"
-nix = { version = "0.29", features = ["net", "ioctl"] }
+nix = { version = "0.31", features = ["net", "ioctl"] }
 
 [dev-dependencies]
 tempfile = "3"
