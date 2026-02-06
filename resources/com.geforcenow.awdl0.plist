@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.geforcenow.awdl0</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/geforcenow-awdl0</string>
+        <string>run</string>
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>ProcessType</key>
+    <string>Background</string>
+    
+    <key>StandardOutPath</key>
+    <string>/var/log/geforcenow-awdl0/stdout.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/var/log/geforcenow-awdl0/stderr.log</string>
+    
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+</dict>
+</plist>
