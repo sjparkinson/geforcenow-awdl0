@@ -106,7 +106,7 @@ impl ProcessMonitor {
         self.check_running_applications(&workspace);
 
         // Register for launch and termination notifications
-        self.register_notifications(&workspace)?;
+        self.register_notifications(&workspace);
 
         info!("process monitor started successfully");
         Ok(())
@@ -140,7 +140,7 @@ impl ProcessMonitor {
     }
 
     /// Register for workspace notifications.
-    fn register_notifications(&self, workspace: &NSWorkspace) -> Result<()> {
+    fn register_notifications(&self, workspace: &NSWorkspace) {
         let notification_center = unsafe { workspace.notificationCenter() };
 
         // Get notification names - these are NSString constants
@@ -157,8 +157,6 @@ impl ProcessMonitor {
         self.observers
             .borrow_mut()
             .extend([launch_observer, terminate_observer]);
-
-        Ok(())
     }
 
     /// Register for a specific notification.

@@ -18,6 +18,10 @@ const SIOCGIFFLAGS: libc::c_ulong = 0xc020_6911;
 /// Not defined in libc crate for macOS.
 const SIOCSIFFLAGS: libc::c_ulong = 0x8020_6910;
 
+/// Interface flag for "up" state.
+/// Using i16 to match the `ifru_flags` field type.
+const IFF_UP: i16 = libc::IFF_UP as i16;
+
 /// Errors that can occur when controlling network interfaces.
 #[derive(Debug, Error)]
 pub enum InterfaceError {
@@ -102,7 +106,7 @@ impl MacOsInterfaceController {
     }
 
     /// Get the current flags for an interface.
-    fn get_flags(&self, name: &str) -> Result<i16> {
+    fn get_flags(name: &str) -> Result<i16> {
         let sock = Self::create_socket()?;
         let ifname = Self::validate_name(name)?;
 
@@ -124,7 +128,7 @@ impl MacOsInterfaceController {
     }
 
     /// Set the flags for an interface.
-    fn set_flags(&self, name: &str, flags: i16) -> Result<()> {
+    fn set_flags(name: &str, flags: i16) -> Result<()> {
         let sock = Self::create_socket()?;
         let ifname = Self::validate_name(name)?;
 
@@ -154,16 +158,16 @@ impl Default for MacOsInterfaceController {
 
 impl InterfaceController for MacOsInterfaceController {
     fn bring_down(&self, name: &str) -> Result<()> {
-        let current_flags = self.get_flags(name)?;
-        let is_up = (current_flags & (libc::IFF_UP as i16)) != 0;
+        let current_flags = Self::get_flags(name)?;
+        let is_up = (current_flags & IFF_UP) != 0;
 
         if !is_up {
             debug!(interface = name, "interface already down");
             return Ok(());
         }
 
-        let new_flags = current_flags & !(libc::IFF_UP as i16);
-        self.set_flags(name, new_flags)?;
+        let new_flags = current_flags & !IFF_UP;
+        Self::set_flags(name, new_flags)?;
 
         info!(interface = name, "brought interface down");
         Ok(())
@@ -174,7 +178,7 @@ impl InterfaceController for MacOsInterfaceController {
         // blocking it. The system will bring it up when needed (e.g., for AirDrop).
         // However, if we want to explicitly allow it, we can set the UP flag.
 
-        let current_flags = match self.get_flags(name) {
+        let current_flags = match Self::get_flags(name) {
             Ok(flags) => flags,
             Err(InterfaceError::NotFound(_)) => {
                 // Interface might not exist if system hasn't created it yet
@@ -184,23 +188,23 @@ impl InterfaceController for MacOsInterfaceController {
             Err(e) => return Err(e),
         };
 
-        let is_up = (current_flags & (libc::IFF_UP as i16)) != 0;
+        let is_up = (current_flags & IFF_UP) != 0;
 
         if is_up {
             debug!(interface = name, "interface already up");
             return Ok(());
         }
 
-        let new_flags = current_flags | (libc::IFF_UP as i16);
-        self.set_flags(name, new_flags)?;
+        let new_flags = current_flags | IFF_UP;
+        Self::set_flags(name, new_flags)?;
 
         info!(interface = name, "allowed interface to come up");
         Ok(())
     }
 
     fn is_up(&self, name: &str) -> Result<bool> {
-        let flags = self.get_flags(name)?;
-        Ok((flags & (libc::IFF_UP as i16)) != 0)
+        let flags = Self::get_flags(name)?;
+        Ok((flags & IFF_UP) != 0)
     }
 }
 
