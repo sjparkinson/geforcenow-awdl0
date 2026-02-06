@@ -20,6 +20,7 @@ const SIOCSIFFLAGS: libc::c_ulong = 0x8020_6910;
 
 /// Interface flag for "up" state.
 /// Using i16 to match the `ifru_flags` field type.
+#[allow(clippy::cast_possible_truncation)]
 const IFF_UP: i16 = libc::IFF_UP as i16;
 
 /// Errors that can occur when controlling network interfaces.
