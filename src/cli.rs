@@ -203,7 +203,7 @@ pub fn status() -> Result<()> {
     Ok(())
 }
 
-/// Generate the LaunchDaemon plist content.
+/// Generate the `LaunchDaemon` plist content.
 #[cfg(target_os = "macos")]
 fn generate_plist() -> String {
     format!(

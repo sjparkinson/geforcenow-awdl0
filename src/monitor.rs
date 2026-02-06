@@ -63,7 +63,7 @@ pub struct ProcessMonitor {
     callback: EventCallback,
     /// Stored observers to ensure they stay alive.
     /// We use `RefCell` because observers are set up on the main thread.
-    _observers: RefCell<Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>>,
+    observers: RefCell<Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>>,
 }
 
 impl ProcessMonitor {
@@ -76,7 +76,7 @@ impl ProcessMonitor {
         Self {
             config,
             callback,
-            _observers: RefCell::new(Vec::new()),
+            observers: RefCell::new(Vec::new()),
         }
     }
 
@@ -148,14 +148,13 @@ impl ProcessMonitor {
         let terminate_name = NSString::from_str("NSWorkspaceDidTerminateApplicationNotification");
 
         // Register for launch notifications
-        let launch_observer =
-            self.register_notification(&notification_center, &launch_name, true)?;
+        let launch_observer = self.register_notification(&notification_center, &launch_name, true);
 
         // Register for termination notifications
         let terminate_observer =
-            self.register_notification(&notification_center, &terminate_name, false)?;
+            self.register_notification(&notification_center, &terminate_name, false);
 
-        self._observers
+        self.observers
             .borrow_mut()
             .extend([launch_observer, terminate_observer]);
 
@@ -168,7 +167,7 @@ impl ProcessMonitor {
         center: &NSNotificationCenter,
         name: &NSString,
         is_launch: bool,
-    ) -> Result<Retained<ProtocolObject<dyn NSObjectProtocol>>> {
+    ) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
         let target_bundle_id = self.config.target_bundle_id.clone();
         let callback = Arc::clone(&self.callback);
 
@@ -194,7 +193,7 @@ impl ProcessMonitor {
             "registered notification observer"
         );
 
-        Ok(observer)
+        observer
     }
 }
 
@@ -205,12 +204,9 @@ fn handle_notification(
     callback: &EventCallback,
     is_launch: bool,
 ) {
-    let user_info = match unsafe { notification.userInfo() } {
-        Some(info) => info,
-        None => {
-            warn!("notification missing userInfo");
-            return;
-        }
+    let Some(user_info) = (unsafe { notification.userInfo() }) else {
+        warn!("notification missing userInfo");
+        return;
     };
 
     // Get the NSRunningApplication from userInfo

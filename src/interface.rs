@@ -46,15 +46,27 @@ pub type Result<T> = std::result::Result<T, InterfaceError>;
 /// with mock implementations.
 pub trait InterfaceController: Send + Sync {
     /// Bring the specified interface down (disable it).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interface cannot be found or controlled.
     fn bring_down(&self, name: &str) -> Result<()>;
 
     /// Allow the interface to come back up.
     ///
     /// Note: On macOS, `awdl0` is managed by the system. This doesn't force it up,
     /// but removes any restrictions we've placed on it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interface cannot be found or controlled.
     fn allow_up(&self, name: &str) -> Result<()>;
 
     /// Check if the interface is currently up.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interface cannot be found or queried.
     fn is_up(&self, name: &str) -> Result<bool>;
 }
 
