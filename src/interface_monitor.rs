@@ -6,10 +6,11 @@
 use std::sync::Arc;
 
 use core_foundation::array::CFArray;
-use core_foundation::base::TCFType;
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_foundation::string::CFString;
-use system_configuration::dynamic_store::{SCDynamicStore, SCDynamicStoreBuilder};
+use system_configuration::dynamic_store::{
+    SCDynamicStore, SCDynamicStoreBuilder, SCDynamicStoreCallBackContext,
+};
 use thiserror::Error;
 use tracing::{debug, info, trace, warn};
 
@@ -106,10 +107,15 @@ impl InterfaceStateMonitor {
             }
         };
 
-        // Create the dynamic store with a callback
+        // Create the dynamic store with a callback context
+        let callback_context = SCDynamicStoreCallBackContext {
+            callout: store_callback,
+            info: (),
+        };
         let store = SCDynamicStoreBuilder::new("geforcenow-awdl0-interface-monitor")
-            .callback_context(store_callback)
-            .build();
+            .callback_context(callback_context)
+            .build()
+            .ok_or(InterfaceMonitorError::StoreCreation)?;
 
         // Create the key pattern to watch for interface link state changes
         // Key format: State:/Network/Interface/<interface>/Link
@@ -120,7 +126,9 @@ impl InterfaceStateMonitor {
 
         // Set the notification keys
         // We watch for specific keys (not patterns) for the Link state
-        if !store.set_notification_keys(&[link_key_cf.clone()], &[]) {
+        let keys = CFArray::from_CFTypes(&[link_key_cf]);
+        let patterns: CFArray<CFString> = CFArray::from_CFTypes(&[]);
+        if !store.set_notification_keys(&keys, &patterns) {
             warn!("failed to set notification keys");
             return Err(InterfaceMonitorError::SetNotificationKeys);
         }
