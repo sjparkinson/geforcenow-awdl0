@@ -9,7 +9,7 @@ use std::sync::Arc;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{msg_send_id, ClassType};
+use objc2::{msg_send, ClassType};
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::{
     MainThreadMarker, NSNotification, NSNotificationCenter, NSObjectProtocol, NSOperationQueue,
@@ -100,7 +100,7 @@ impl ProcessMonitor {
 
         // Get the shared workspace
         let workspace: Retained<NSWorkspace> =
-            unsafe { msg_send_id![objc2_app_kit::NSWorkspace::class(), sharedWorkspace] };
+            unsafe { msg_send![objc2_app_kit::NSWorkspace::class(), sharedWorkspace] };
 
         // Check if target is already running
         self.check_running_applications(&workspace);
@@ -114,14 +114,14 @@ impl ProcessMonitor {
 
     /// Check if the target application is currently running.
     fn check_running_applications(&self, workspace: &NSWorkspace) {
-        let running_apps = unsafe { workspace.runningApplications() };
+        let running_apps = workspace.runningApplications();
 
         for app in &*running_apps {
-            if let Some(bundle_id) = get_bundle_identifier(app) {
+            if let Some(bundle_id) = get_bundle_identifier(&app) {
                 trace!(bundle_id = %bundle_id, "checking running application");
 
                 if bundle_id == self.config.target_bundle_id {
-                    let pid = get_process_identifier(app);
+                    let pid = get_process_identifier(&app);
                     info!(
                         bundle_id = %bundle_id,
                         pid = pid,
@@ -141,7 +141,7 @@ impl ProcessMonitor {
 
     /// Register for workspace notifications.
     fn register_notifications(&self, workspace: &NSWorkspace) {
-        let notification_center = unsafe { workspace.notificationCenter() };
+        let notification_center = workspace.notificationCenter();
 
         // Get notification names - these are NSString constants
         let launch_name = NSString::from_str("NSWorkspaceDidLaunchApplicationNotification");
@@ -175,9 +175,9 @@ impl ProcessMonitor {
             handle_notification(notification, &target_bundle_id, &callback, is_launch);
         });
 
-        let queue = unsafe { NSOperationQueue::mainQueue() };
+        let queue = NSOperationQueue::mainQueue();
         let observer: Retained<ProtocolObject<dyn NSObjectProtocol>> = unsafe {
-            msg_send_id![
+            msg_send![
                 center,
                 addObserverForName: name,
                 object: std::ptr::null::<objc2::runtime::AnyObject>(),
@@ -202,7 +202,7 @@ fn handle_notification(
     callback: &EventCallback,
     is_launch: bool,
 ) {
-    let Some(user_info) = (unsafe { notification.userInfo() }) else {
+    let Some(user_info) = notification.userInfo() else {
         warn!("notification missing userInfo");
         return;
     };
@@ -210,9 +210,9 @@ fn handle_notification(
     // Get the NSRunningApplication from userInfo
     // The key is NSWorkspaceApplicationKey
     let app_key = NSString::from_str("NSWorkspaceApplicationKey");
-    let app: Option<Retained<NSRunningApplication>> = unsafe {
+    let app: Option<Retained<NSRunningApplication>> = {
         let obj = user_info.objectForKey(&app_key);
-        obj.map(|o| msg_send_id![&o, self])
+        obj.map(|o| unsafe { msg_send![&o, self] })
     };
 
     let Some(app) = app else {
@@ -248,7 +248,7 @@ fn handle_notification(
 
 /// Get the bundle identifier from an `NSRunningApplication`.
 fn get_bundle_identifier(app: &NSRunningApplication) -> Option<String> {
-    let bundle_id: Option<Retained<NSString>> = unsafe { app.bundleIdentifier() };
+    let bundle_id: Option<Retained<NSString>> = app.bundleIdentifier();
     bundle_id.map(|s| s.to_string())
 }
 
