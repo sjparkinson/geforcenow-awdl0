@@ -41,14 +41,15 @@ pub enum InterfaceEvent {
 /// Callback type for interface events.
 pub type InterfaceEventCallback = Arc<dyn Fn(InterfaceEvent) + Send + Sync>;
 
-/// Context passed to the SCDynamicStore callback function.
+/// Context passed to the `SCDynamicStore` callback function.
 struct CallbackContext {
     interface: String,
     callback: InterfaceEventCallback,
 }
 
-/// The callback function for SCDynamicStore notifications.
-/// This must be a plain function (not a closure) because SCDynamicStore requires a function pointer.
+/// The callback function for `SCDynamicStore` notifications.
+/// This must be a plain function (not a closure) because `SCDynamicStore` requires a function pointer.
+#[allow(clippy::needless_pass_by_value)] // Signature is dictated by system-configuration crate
 fn dynamic_store_callback(
     _store: SCDynamicStore,
     changed_keys: CFArray<CFString>,
@@ -86,7 +87,7 @@ pub struct InterfaceStateMonitor {
     interface: String,
     callback: InterfaceEventCallback,
     /// Stored dynamic store to keep it alive.
-    _store: Option<SCDynamicStore>,
+    store: Option<SCDynamicStore>,
 }
 
 impl InterfaceStateMonitor {
@@ -99,7 +100,7 @@ impl InterfaceStateMonitor {
         Self {
             interface: interface.to_string(),
             callback,
-            _store: None,
+            store: None,
         }
     }
 
@@ -163,7 +164,7 @@ impl InterfaceStateMonitor {
         );
 
         // Store the dynamic store to keep it alive
-        self._store = Some(store);
+        self.store = Some(store);
 
         Ok(())
     }
