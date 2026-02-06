@@ -33,7 +33,7 @@ thiserror = "2"
 # macOS Objective-C bindings
 block2 = "0.5"
 objc2 = "0.5"
-objc2-foundation = { version = "0.2", features = [
+objc2-foundation = { version = "0.3", features = [
     "NSDictionary",
     "NSEnumerator",
     "NSNotification",
