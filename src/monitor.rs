@@ -7,13 +7,13 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use block2::RcBlock;
+use objc2::msg_send_id;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{msg_send_id, ClassType};
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::{
-    MainThreadMarker, NSNotification, NSNotificationCenter, NSNotificationName, NSObject,
-    NSObjectProtocol, NSOperationQueue, NSString,
+    MainThreadMarker, NSNotification, NSNotificationCenter, NSNotificationName, NSObjectProtocol,
+    NSOperationQueue, NSString,
 };
 use thiserror::Error;
 use tracing::{debug, info, trace, warn};
@@ -121,12 +121,12 @@ impl ProcessMonitor {
     fn check_running_applications(&self, workspace: &NSWorkspace) {
         let running_apps = unsafe { workspace.runningApplications() };
 
-        for app in running_apps {
-            if let Some(bundle_id) = get_bundle_identifier(&app) {
+        for app in &*running_apps {
+            if let Some(bundle_id) = get_bundle_identifier(app) {
                 trace!(bundle_id = %bundle_id, "checking running application");
 
                 if bundle_id == self.config.target_bundle_id {
-                    let pid = unsafe { app.processIdentifier() };
+                    let pid = get_process_identifier(app);
                     info!(
                         bundle_id = %bundle_id,
                         pid = pid,
@@ -277,7 +277,7 @@ fn handle_notification(
         return;
     }
 
-    let pid = unsafe { app.processIdentifier() };
+    let pid = get_process_identifier(&app);
 
     if is_launch {
         info!(bundle_id = %bundle_id, pid = pid, "target application launched");
@@ -292,6 +292,12 @@ fn handle_notification(
 fn get_bundle_identifier(app: &NSRunningApplication) -> Option<String> {
     let bundle_id: Option<Retained<NSString>> = unsafe { app.bundleIdentifier() };
     bundle_id.map(|s| s.to_string())
+}
+
+/// Get the process identifier from an NSRunningApplication.
+fn get_process_identifier(app: &NSRunningApplication) -> i32 {
+    // Use msg_send since processIdentifier may not be directly exposed
+    unsafe { objc2::msg_send![app, processIdentifier] }
 }
 
 #[cfg(test)]

@@ -10,6 +10,14 @@ use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
+/// ioctl request to get interface flags (macOS specific).
+/// Not defined in libc crate for macOS.
+const SIOCGIFFLAGS: libc::c_ulong = 0xc020_6911;
+
+/// ioctl request to set interface flags (macOS specific).
+/// Not defined in libc crate for macOS.
+const SIOCSIFFLAGS: libc::c_ulong = 0x8020_6910;
+
 /// Errors that can occur when controlling network interfaces.
 #[derive(Debug, Error)]
 pub enum InterfaceError {
@@ -89,7 +97,7 @@ impl MacOsInterfaceController {
         let mut ifr = ifreq::new(&ifname);
 
         // SAFETY: We're calling ioctl with a valid socket fd and properly initialized ifreq
-        let result = unsafe { libc::ioctl(sock.as_raw_fd(), libc::SIOCGIFFLAGS, &mut ifr) };
+        let result = unsafe { libc::ioctl(sock.as_raw_fd(), SIOCGIFFLAGS, &mut ifr) };
 
         if result < 0 {
             let err = std::io::Error::last_os_error();
@@ -112,7 +120,7 @@ impl MacOsInterfaceController {
         ifr.ifr_ifru.ifru_flags = flags;
 
         // SAFETY: We're calling ioctl with a valid socket fd and properly initialized ifreq
-        let result = unsafe { libc::ioctl(sock.as_raw_fd(), libc::SIOCSIFFLAGS, &mut ifr) };
+        let result = unsafe { libc::ioctl(sock.as_raw_fd(), SIOCSIFFLAGS, &mut ifr) };
 
         if result < 0 {
             let err = std::io::Error::last_os_error();
