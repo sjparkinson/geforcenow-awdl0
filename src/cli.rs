@@ -157,12 +157,8 @@ pub fn uninstall() -> Result<()> {
 }
 
 /// Show the daemon status.
-///
-/// # Errors
-///
-/// Returns an error if launchctl command fails.
 #[cfg(target_os = "macos")]
-pub fn status() -> Result<()> {
+pub fn status() {
     // Check if installed
     let binary_installed = Path::new(INSTALL_PATH).exists();
     let plist_installed = Path::new(PLIST_PATH).exists();
@@ -199,8 +195,6 @@ pub fn status() -> Result<()> {
     // GeForce NOW status (best effort, only works when running with appropriate permissions)
     // We can't easily check this without running NSWorkspace, so we'll skip it
     println!("  GeForce NOW:  Run 'pgrep -f GeForceNOW' to check");
-
-    Ok(())
 }
 
 /// Generate the `LaunchDaemon` plist content.

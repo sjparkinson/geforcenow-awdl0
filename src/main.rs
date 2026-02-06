@@ -88,7 +88,10 @@ fn main() {
         Commands::Run { bundle_id } => run_daemon(&bundle_id),
         Commands::Install => cli::install(),
         Commands::Uninstall => cli::uninstall(),
-        Commands::Status => cli::status(),
+        Commands::Status => {
+            cli::status();
+            Ok(())
+        }
     };
 
     #[cfg(not(target_os = "macos"))]
