@@ -113,6 +113,80 @@ fn main() {
     }
 }
 
+/// Create the callback for process launch/terminate events.
+#[cfg(target_os = "macos")]
+fn create_process_callback(
+    controller: Arc<MacOsInterfaceController>,
+    gfn_running: Arc<AtomicBool>,
+) -> monitor::EventCallback {
+    Arc::new(move |event| match event {
+        ProcessEvent::Launched { bundle_id, pid } => {
+            info!(
+                bundle_id = %bundle_id,
+                pid = pid,
+                "GeForce NOW launched, disabling awdl0"
+            );
+
+            gfn_running.store(true, Ordering::SeqCst);
+
+            if let Err(e) = controller.bring_down(AWDL_INTERFACE) {
+                error!(error = %e, "failed to bring down awdl0");
+            }
+        }
+        ProcessEvent::Terminated { bundle_id, pid } => {
+            info!(
+                bundle_id = %bundle_id,
+                pid = pid,
+                "GeForce NOW terminated, allowing awdl0"
+            );
+
+            gfn_running.store(false, Ordering::SeqCst);
+
+            if let Err(e) = controller.allow_up(AWDL_INTERFACE) {
+                error!(error = %e, "failed to allow awdl0 up");
+            }
+        }
+    })
+}
+
+/// Create the callback for interface state change events.
+#[cfg(target_os = "macos")]
+fn create_interface_callback(
+    controller: Arc<MacOsInterfaceController>,
+    gfn_running: Arc<AtomicBool>,
+) -> interface_monitor::InterfaceEventCallback {
+    Arc::new(move |event| match event {
+        InterfaceEvent::StateChanged { interface } => {
+            // Only act if GeForce NOW is running
+            if gfn_running.load(Ordering::SeqCst) {
+                // Check if awdl0 came back up
+                match controller.is_up(&interface) {
+                    Ok(true) => {
+                        warn!(
+                            interface = %interface,
+                            "awdl0 came back up, bringing it down"
+                        );
+                        if let Err(e) = controller.bring_down(&interface) {
+                            error!(error = %e, "failed to bring down awdl0");
+                        }
+                    }
+                    Ok(false) => {
+                        debug!(interface = %interface, "awdl0 state changed but still down");
+                    }
+                    Err(e) => {
+                        debug!(error = %e, "could not check awdl0 status");
+                    }
+                }
+            } else {
+                debug!(
+                    interface = %interface,
+                    "awdl0 state changed but GeForce NOW not running, ignoring"
+                );
+            }
+        }
+    })
+}
+
 /// Run the daemon.
 #[cfg(target_os = "macos")]
 fn run_daemon() -> cli::Result<()> {
@@ -144,48 +218,18 @@ fn run_daemon() -> cli::Result<()> {
 
     // Create the interface controller
     let controller = Arc::new(MacOsInterfaceController::new());
-    let controller_clone = Arc::clone(&controller);
 
     // Track whether GeForce NOW is currently running
     let gfn_running = Arc::new(AtomicBool::new(false));
-    let gfn_running_clone = Arc::clone(&gfn_running);
-
-    // Create callback for process events
-    let callback: monitor::EventCallback = Arc::new(move |event| match event {
-        ProcessEvent::Launched { bundle_id, pid } => {
-            info!(
-                bundle_id = %bundle_id,
-                pid = pid,
-                "GeForce NOW launched, disabling awdl0"
-            );
-
-            gfn_running_clone.store(true, Ordering::SeqCst);
-
-            if let Err(e) = controller_clone.bring_down(AWDL_INTERFACE) {
-                error!(error = %e, "failed to bring down awdl0");
-            }
-        }
-        ProcessEvent::Terminated { bundle_id, pid } => {
-            info!(
-                bundle_id = %bundle_id,
-                pid = pid,
-                "GeForce NOW terminated, allowing awdl0"
-            );
-
-            gfn_running_clone.store(false, Ordering::SeqCst);
-
-            if let Err(e) = controller_clone.allow_up(AWDL_INTERFACE) {
-                error!(error = %e, "failed to allow awdl0 up");
-            }
-        }
-    });
 
     // Create and start the process monitor
     let config = MonitorConfig {
         target_bundle_id: GEFORCE_NOW_BUNDLE_ID.to_string(),
     };
 
-    let monitor = ProcessMonitor::new(config, callback);
+    let process_callback =
+        create_process_callback(Arc::clone(&controller), Arc::clone(&gfn_running));
+    let monitor = ProcessMonitor::new(config, process_callback);
 
     if let Err(e) = monitor.start() {
         error!(error = %e, "failed to start process monitor");
@@ -195,41 +239,8 @@ fn run_daemon() -> cli::Result<()> {
     }
 
     // Create and start the interface state monitor for faster re-down detection
-    let controller_interface = Arc::clone(&controller);
-    let gfn_running_interface = Arc::clone(&gfn_running);
-
-    let interface_callback: interface_monitor::InterfaceEventCallback =
-        Arc::new(move |event| match event {
-            InterfaceEvent::StateChanged { interface } => {
-                // Only act if GeForce NOW is running
-                if gfn_running_interface.load(Ordering::SeqCst) {
-                    // Check if awdl0 came back up
-                    match controller_interface.is_up(&interface) {
-                        Ok(true) => {
-                            warn!(
-                                interface = %interface,
-                                "awdl0 came back up, bringing it down"
-                            );
-                            if let Err(e) = controller_interface.bring_down(&interface) {
-                                error!(error = %e, "failed to bring down awdl0");
-                            }
-                        }
-                        Ok(false) => {
-                            debug!(interface = %interface, "awdl0 state changed but still down");
-                        }
-                        Err(e) => {
-                            debug!(error = %e, "could not check awdl0 status");
-                        }
-                    }
-                } else {
-                    debug!(
-                        interface = %interface,
-                        "awdl0 state changed but GeForce NOW not running, ignoring"
-                    );
-                }
-            }
-        });
-
+    let interface_callback =
+        create_interface_callback(Arc::clone(&controller), Arc::clone(&gfn_running));
     let mut interface_monitor = InterfaceStateMonitor::new(AWDL_INTERFACE, interface_callback);
 
     if let Err(e) = interface_monitor.start() {
