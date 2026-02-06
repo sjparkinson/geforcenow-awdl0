@@ -116,7 +116,7 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
     );
 
     // Ensure we're on the main thread (required for NSWorkspace)
-    let mtm = MainThreadMarker::new().expect("must run on main thread");
+    let _mtm = MainThreadMarker::new().expect("must run on main thread");
 
     // Set up signal handling
     let running = Arc::new(AtomicBool::new(true));
@@ -191,7 +191,7 @@ fn run_daemon(bundle_id: &str) -> cli::Result<()> {
 
     // Run the main loop
     // We use NSRunLoop to process Cocoa notifications
-    let run_loop = NSRunLoop::mainRunLoop();
+    let run_loop = unsafe { NSRunLoop::mainRunLoop() };
 
     while running.load(Ordering::SeqCst) {
         // Run the loop for a short interval, then check if we should exit
