@@ -31,9 +31,9 @@ thiserror = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS Objective-C bindings
-block2 = "0.5"
-objc2 = "0.5"
-objc2-foundation = { version = "0.2", features = [
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = [
     "NSDictionary",
     "NSEnumerator",
     "NSNotification",
@@ -45,14 +45,14 @@ objc2-foundation = { version = "0.2", features = [
     "NSThread",
     "NSDate",
 ] }
-objc2-app-kit = { version = "0.2", features = [
+objc2-app-kit = { version = "0.3", features = [
     "NSWorkspace",
     "NSRunningApplication",
 ] }
 
 # System interfaces
 libc = "0.2"
-nix = { version = "0.29", features = ["net", "ioctl"] }
+nix = { version = "0.31", features = ["net", "ioctl"] }
 
 [dev-dependencies]
 tempfile = "3"
