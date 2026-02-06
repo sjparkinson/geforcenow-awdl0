@@ -41,7 +41,7 @@ objc2-foundation = { version = "0.2", features = [
     "NSThread",
     "NSDate",
 ] }
-objc2-app-kit = { version = "0.2", features = [
+objc2-app-kit = { version = "0.3", features = [
     "NSWorkspace",
     "NSRunningApplication",
 ] }
