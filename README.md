@@ -9,15 +9,9 @@ On macOS, the `awdl0` interface (Apple Wireless Direct Link) is used for AirDrop
 ## The Solution
 
 This daemon monitors for the GeForce NOW application and automatically:
+
 - **Brings down `awdl0`** when GeForce NOW launches
 - **Allows `awdl0` back up** when GeForce NOW terminates
-
-It uses event-driven macOS APIs (NSWorkspace notifications) rather than polling, resulting in zero CPU overhead when idle.
-
-## Requirements
-
-- macOS 14.0 (Sonoma) or later
-- Root privileges (for network interface control)
 
 ## Installation
 
@@ -70,52 +64,6 @@ ifconfig awdl0
 2. When GeForce NOW (`com.nvidia.gfnpc.mall`) launches, it brings down `awdl0` using `ioctl` syscalls
 3. When GeForce NOW terminates, it allows `awdl0` to return to its normal state
 4. The daemon periodically verifies `awdl0` stays down while gaming (macOS may try to re-enable it)
-
-## Configuration
-
-## Files
-
-| Path | Description |
-|------|-------------|
-| `/usr/local/bin/geforcenow-awdl0` | The daemon binary |
-| `/Library/LaunchDaemons/com.geforcenow.awdl0.plist` | launchd configuration |
-| `/var/log/geforcenow-awdl0/stdout.log` | Standard output log |
-| `/var/log/geforcenow-awdl0/stderr.log` | Standard error log |
-
-## Troubleshooting
-
-### Daemon Won't Start
-
-Check if it's loaded:
-```bash
-sudo launchctl list | grep geforcenow
-```
-
-Try manually loading:
-```bash
-sudo launchctl load -w /Library/LaunchDaemons/com.geforcenow.awdl0.plist
-```
-
-### awdl0 Keeps Coming Back Up
-
-This is normal - macOS aggressively re-enables awdl0. The daemon monitors for this and brings it back down while GeForce NOW is running.
-
-### Permission Denied
-
-The daemon must run as root to control network interfaces. Ensure you're using `sudo` for installation and the daemon is configured as a LaunchDaemon (not LaunchAgent).
-
-## Uninstallation
-
-```bash
-sudo geforcenow-awdl0 uninstall
-```
-
-This will:
-1. Stop and unload the daemon
-2. Remove the LaunchDaemon plist
-3. Remove the binary from `/usr/local/bin`
-
-Log files in `/var/log/geforcenow-awdl0/` are preserved.
 
 ## License
 
