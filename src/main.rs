@@ -23,10 +23,14 @@ mod cli;
 #[cfg(target_os = "macos")]
 mod interface;
 #[cfg(target_os = "macos")]
+mod interface_monitor;
+#[cfg(target_os = "macos")]
 mod monitor;
 
 #[cfg(target_os = "macos")]
 use interface::{InterfaceController, MacOsInterfaceController};
+#[cfg(target_os = "macos")]
+use interface_monitor::{InterfaceEvent, InterfaceStateMonitor};
 #[cfg(target_os = "macos")]
 use monitor::{MonitorConfig, ProcessEvent, ProcessMonitor};
 
@@ -34,7 +38,7 @@ use monitor::{MonitorConfig, ProcessEvent, ProcessMonitor};
 #[cfg(target_os = "macos")]
 const AWDL_INTERFACE: &str = "awdl0";
 
-/// The bundle ID for GeForce NOW.
+/// The bundle ID for `GeForce NOW`.
 #[cfg(target_os = "macos")]
 const GEFORCE_NOW_BUNDLE_ID: &str = "com.nvidia.gfnpc.mall";
 
@@ -190,6 +194,51 @@ fn run_daemon() -> cli::Result<()> {
         )));
     }
 
+    // Create and start the interface state monitor for faster re-down detection
+    let controller_interface = Arc::clone(&controller);
+    let gfn_running_interface = Arc::clone(&gfn_running);
+
+    let interface_callback: interface_monitor::InterfaceEventCallback =
+        Arc::new(move |event| match event {
+            InterfaceEvent::StateChanged { interface } => {
+                // Only act if GeForce NOW is running
+                if gfn_running_interface.load(Ordering::SeqCst) {
+                    // Check if awdl0 came back up
+                    match controller_interface.is_up(&interface) {
+                        Ok(true) => {
+                            warn!(
+                                interface = %interface,
+                                "awdl0 came back up, bringing it down"
+                            );
+                            if let Err(e) = controller_interface.bring_down(&interface) {
+                                error!(error = %e, "failed to bring down awdl0");
+                            }
+                        }
+                        Ok(false) => {
+                            debug!(interface = %interface, "awdl0 state changed but still down");
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "could not check awdl0 status");
+                        }
+                    }
+                } else {
+                    debug!(
+                        interface = %interface,
+                        "awdl0 state changed but GeForce NOW not running, ignoring"
+                    );
+                }
+            }
+        });
+
+    let mut interface_monitor = InterfaceStateMonitor::new(AWDL_INTERFACE, interface_callback);
+
+    if let Err(e) = interface_monitor.start() {
+        error!(error = %e, "failed to start interface state monitor");
+        return Err(cli::CliError::Launchctl(format!(
+            "failed to start interface state monitor: {e}"
+        )));
+    }
+
     info!("daemon running, waiting for events");
 
     // Run the main loop
@@ -200,27 +249,6 @@ fn run_daemon() -> cli::Result<()> {
         // Run the loop for a short interval, then check if we should exit
         // This allows us to handle signals gracefully
         run_loop.runUntilDate(&objc2_foundation::NSDate::dateWithTimeIntervalSinceNow(1.0));
-
-        // If GeForce NOW is running, periodically check that awdl0 is still down
-        // (the system might try to bring it back up)
-        if gfn_running.load(Ordering::SeqCst) {
-            match controller.is_up(AWDL_INTERFACE) {
-                Ok(true) => {
-                    warn!(
-                        "awdl0 came back up while GeForce NOW is running, bringing it down again"
-                    );
-                    if let Err(e) = controller.bring_down(AWDL_INTERFACE) {
-                        error!(error = %e, "failed to bring down awdl0");
-                    }
-                }
-                Ok(false) => {
-                    debug!("awdl0 is down as expected");
-                }
-                Err(e) => {
-                    debug!(error = %e, "could not check awdl0 status");
-                }
-            }
-        }
     }
 
     info!("daemon shutting down");
