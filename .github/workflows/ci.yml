@@ -15,7 +15,7 @@ jobs:
     name: Check
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -35,7 +35,7 @@ jobs:
     name: Format
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -44,7 +44,7 @@ jobs:
     name: Clippy
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -64,7 +64,7 @@ jobs:
     name: Test
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -84,7 +84,7 @@ jobs:
     name: Build
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache cargo registry
         uses: actions/cache@v4
