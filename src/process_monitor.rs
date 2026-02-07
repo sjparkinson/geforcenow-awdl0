@@ -569,7 +569,6 @@ mod tests {
 
     #[test]
     fn test_callback_receives_events() {
-        let config = MonitorConfig::default();
         let event_count = Arc::new(AtomicU32::new(0));
         let event_count_clone = Arc::clone(&event_count);
 
