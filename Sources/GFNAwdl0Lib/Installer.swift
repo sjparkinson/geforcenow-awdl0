@@ -13,9 +13,7 @@ public enum Installer {
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>
-                \(launchctlLabel)
-            </string>
+            <string>\(launchctlLabel)</string>
             <key>ProgramArguments</key>
             <array>
                 <string>\(programPath)</string>
@@ -78,7 +76,7 @@ public enum Installer {
         }
 
         // Unload any existing registration first (ignore errors)
-        _ = shell("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
+        _ = shellQuiet("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
 
         // Load the agent for the current user
         let loadResult = shell("launchctl", "bootstrap", "gui/\(getuid())", targetPlistPath)
@@ -97,7 +95,7 @@ public enum Installer {
         print("Uninstalling geforcenow-awdl0 (per-user)...")
 
         // Unload the agent
-        let unloadResult = shell("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
+        let unloadResult = shellQuiet("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
         if verbose {
             print("  Unloaded agent (exit code \(unloadResult))")
         }
@@ -152,6 +150,19 @@ public enum Installer {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = args
+        try? process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
+    @discardableResult
+    private static func shellQuiet(_ args: String...) -> Int32 {
+        let process = Process()
+        let outPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = args
+        process.standardOutput = outPipe
+        process.standardError = outPipe
         try? process.run()
         process.waitUntilExit()
         return process.terminationStatus
