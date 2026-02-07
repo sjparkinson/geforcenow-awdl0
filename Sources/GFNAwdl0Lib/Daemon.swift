@@ -58,7 +58,13 @@ public actor Daemon {
                 while !shouldStop.pointee {
                     // Process pending events on the main run loop
                     // Using a short timeout to stay responsive to shutdown
-                    _ = CFRunLoopRunInMode(.defaultMode, 0.5, true)
+                    // Dispatch to main queue to escape async context restriction
+                    await withCheckedContinuation { continuation in
+                        DispatchQueue.main.async {
+                            _ = CFRunLoopRunInMode(.defaultMode, 0.5, true)
+                            continuation.resume()
+                        }
+                    }
                 }
                 group.cancelAll()
             }
@@ -108,7 +114,7 @@ public actor Daemon {
                 let windowMonitor = WindowMonitor(pid: pid)
                 for await windowEvent in windowMonitor.events() {
                     guard !Task.isCancelled else { break }
-                    await self.handleWindowEvent(windowEvent)
+                    self.handleWindowEvent(windowEvent)
                     // Stop if process is no longer tracked
                     if self.geforceNowPid != pid {
                         break
