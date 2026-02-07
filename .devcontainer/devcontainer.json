@@ -2,14 +2,7 @@
 {
 	"name": "Swift",
 	"image": "swift:6.0-noble",
-	"features": {
-		"ghcr.io/devcontainers/features/common-utils:2": {
-			"installZsh": true,
-			"configureZshAsDefaultShell": true,
-			"installOhMyZsh": true,
-			"upgradePackages": false
-		}
-	},
+	"features": {},
 	"customizations": {
 		"vscode": {
 			"extensions": [

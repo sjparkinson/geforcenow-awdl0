@@ -167,17 +167,3 @@ struct DaemonTests {
         _ = try Daemon()
     }
 }
-
-@Suite("Installer Tests")
-struct InstallerTests {
-    @Test("InstallerError descriptions")
-    func errorDescriptions() {
-        let errors: [InstallerError] = [
-            .rootRequired,
-            .executableNotFound
-        ]
-        for error in errors {
-            #expect(!error.description.isEmpty)
-        }
-    }
-}

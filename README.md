@@ -26,40 +26,44 @@ This daemon monitors for the GeForce NOW application and automatically:
 git clone https://github.com/sjparkinson/geforcenow-awdl0.git
 cd geforcenow-awdl0
 
-# Build the release binary
-swift build -c release
+# Build using the provided Makefile (release build)
+make build
 
-# Install (per-user LaunchAgent)
-# The installer copies the binary to `~/bin/geforcenow-awdl0`, writes a LaunchAgent
-# to `~/Library/LaunchAgents/` and logs to `~/Library/Logs/geforcenow-awdl0`.
-.build/release/geforcenow-awdl0 install
+# Install the LaunchAgent and binary
+make install
 ```
+
+The repository Makefile exposes the following targets:
+
+- `make build`: Build the release binary at `.build/release/geforcenow-awdl0`.
+- `make install`: Install the LaunchAgent and binary. This copies the
+	binary to `~/bin/geforcenow-awdl0`, writes the LaunchAgent to
+	`~/Library/LaunchAgents/io.github.sjparkinson.geforcenow-awdl0.plist` (using `~/` paths),
+	and creates logs at `~/Library/Logs/geforcenow-awdl0`.
+- `make uninstall`: Uninstall the LaunchAgent and remove the installed binary.
+- `make run`: Run the compiled binary directly for debugging.
+
+Logs are written to `~/Library/Logs/geforcenow-awdl0` (stdout and stderr files).
 
 ## Usage
 
-### Commands
+Use the Makefile targets or the compiled binary to manage the daemon.
 
 ```bash
 # Install and start the daemon
-.build/release/geforcenow-awdl0 install
+make install
 
-# Check daemon status
-.build/release/geforcenow-awdl0 status
+# Run the daemon manually for debugging
+make run
 
 # Uninstall the daemon
-.build/release/geforcenow-awdl0 uninstall
-
-# Run the daemon manually (for debugging)
-.build/release/geforcenow-awdl0 run --verbose
+make uninstall
 ```
 
 ### Verifying It's Working
 
 ```bash
-# Check daemon status
-.build/release/geforcenow-awdl0 status
-
-# View logs
+# Tail logs
 tail -f ~/Library/Logs/geforcenow-awdl0/stderr.log
 
 # Check awdl0 interface status
