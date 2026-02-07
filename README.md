@@ -16,8 +16,8 @@ This daemon monitors for the GeForce NOW application and automatically:
 
 ## Requirements
 
-- macOS
-- Swift
+- macOS 26.0 or later
+- [Swift](https://www.swift.org/install/macos/) 6.2 or later
 
 ## Installation
 
@@ -38,12 +38,12 @@ The repository Makefile exposes the following targets:
 - `make build`: Build the release binary at `.build/release/geforcenow-awdl0`.
 - `make install`: Install the LaunchAgent and binary. This copies the
 	binary to `~/bin/geforcenow-awdl0`, writes the LaunchAgent to
-	`~/Library/LaunchAgents/io.github.sjparkinson.geforcenow-awdl0.plist` (using `~/` paths),
-	and creates logs at `~/Library/Logs/geforcenow-awdl0`.
+	`~/Library/LaunchAgents/io.github.sjparkinson.geforcenow-awdl0.plist`,
+	and creates logs at `~/Library/Logs/geforcenow-awdl0.log`.
 - `make uninstall`: Uninstall the LaunchAgent and remove the installed binary.
 - `make run`: Run the compiled binary directly for debugging.
 
-Logs are written to `~/Library/Logs/geforcenow-awdl0` (stdout and stderr files).
+Logs are written to `~/Library/Logs/geforcenow-awdl0.log`.
 
 ## Usage
 
@@ -64,7 +64,7 @@ make uninstall
 
 ```bash
 # Tail logs
-tail -f ~/Library/Logs/geforcenow-awdl0/stderr.log
+tail -f ~/Library/Logs/geforcenow-awdl0.log
 
 # Check awdl0 interface status
 ifconfig awdl0

@@ -6,7 +6,7 @@
     <string>io.github.sjparkinson.geforcenow-awdl0</string>
     <key>ProgramArguments</key>
     <array>
-        <string>./bin/geforcenow-awdl0</string>
+        <string>__TARGET_BIN__</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -17,8 +17,8 @@
     <key>ThrottleInterval</key>
     <integer>5</integer>
     <key>StandardOutPath</key>
-    <string>./Library/Logs/geforcenow-awdl0.log</string>
+    <string>__LOG_PATH__</string>
     <key>StandardErrorPath</key>
-    <string>./Library/Logs/geforcenow-awdl0.log</string>
+    <string>__LOG_PATH__</string>
 </dict>
 </plist>
