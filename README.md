@@ -16,21 +16,10 @@ This daemon monitors for the GeForce NOW application and automatically:
 
 ## Requirements
 
-- macOS 13.0 (Ventura) or later
-- Swift 6.0+ (for building from source)
+- macOS
+- Swift
 
 ## Installation
-
-### From Release Binary
-
-Download the latest release from the [Releases](https://github.com/sjparkinson/geforcenow-awdl0/releases) page:
-
-```bash
-# Download and install
-sudo ./geforcenow-awdl0 install
-```
-
-### From Source
 
 ```bash
 # Clone the repository
@@ -101,21 +90,6 @@ ifconfig awdl0
 3. **Interface control**: When streaming starts (fullscreen detected), brings down `awdl0` using `ioctl` syscalls. When streaming ends, allows `awdl0` back up.
 
 4. **Interface monitoring**: Uses `SCDynamicStore` to watch for `awdl0` state changes—if macOS re-enables `awdl0` during a stream, the daemon brings it back down.
-
-## Development
-
-The project uses Swift Package Manager. A devcontainer configuration is provided for development in VS Code or GitHub Codespaces (note: builds require macOS, the devcontainer provides syntax highlighting and LSP support only).
-
-```bash
-# Build debug
-swift build
-
-# Build release
-swift build -c release
-
-# Run tests
-swift test
-```
 
 ## License
 
