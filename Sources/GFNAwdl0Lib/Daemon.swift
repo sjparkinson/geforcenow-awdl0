@@ -185,13 +185,3 @@ public actor Daemon {
     }
 }
 #endif
-            signal(SIGINT, SIG_IGN)
-
-            continuation.onTermination = { _ in
-                termSource.cancel()
-                intSource.cancel()
-            }
-        }
-    }
-}
-#endif

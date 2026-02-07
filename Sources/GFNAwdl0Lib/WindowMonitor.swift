@@ -1,5 +1,6 @@
 #if os(macOS)
 import CoreGraphics
+import Foundation
 import Logging
 
 /// Events emitted by the WindowMonitor
