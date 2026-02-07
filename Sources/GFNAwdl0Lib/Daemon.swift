@@ -3,14 +3,6 @@ import Dispatch
 import Foundation
 import Logging
 
-/// Internal events for the daemon's state machine
-private enum DaemonEvent: Sendable {
-    case process(ProcessEvent)
-    case window(WindowEvent)
-    case interface(InterfaceEvent)
-    case shutdown
-}
-
 /// The main daemon actor that orchestrates all monitors and the interface controller
 public actor Daemon {
     private let logger = Logger(label: "Daemon")
@@ -18,6 +10,7 @@ public actor Daemon {
 
     private var geforceNowPid: pid_t?
     private var isStreaming = false
+    private var windowMonitorTask: Task<Void, Never>?
 
     public init() throws {
         self.interfaceController = try InterfaceController()
@@ -29,8 +22,8 @@ public actor Daemon {
         let logger = Logger(label: "Daemon")
         logger.info("Starting geforcenow-awdl0 daemon")
 
-        // Create a stream for shutdown signals
-        let shutdownStream = Self.signalStream()
+        // Set up signal handling
+        let shouldStop = setupSignalHandling()
 
         // Create monitors
         let processMonitor = ProcessMonitor()
@@ -42,7 +35,7 @@ public actor Daemon {
 
         logger.info("Daemon started, waiting for GeForce NOW...")
 
-        // Merge all event streams and process them
+        // Process events using task groups
         await withTaskGroup(of: Void.self) { group in
             // Process events task
             group.addTask {
@@ -58,26 +51,47 @@ public actor Daemon {
                 }
             }
 
-            // Shutdown signal task
-            group.addTask {
-                for await _ in shutdownStream {
-                    logger.info("Received shutdown signal")
-                    await self.shutdown()
-                    group.cancelAll()
-                    return
-                }
-            }
-
-            // RunLoop task - keeps the main run loop alive for notifications
+            // Keep the run loop alive for NSWorkspace notifications
+            // This runs synchronously on the main thread between await points
             group.addTask { @MainActor in
-                while !Task.isCancelled {
-                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
-                    await Task.yield()
+                // Poll for shutdown signal while keeping run loop alive
+                while !shouldStop.pointee {
+                    // Process pending events on the main run loop
+                    // Using a short timeout to stay responsive to shutdown
+                    _ = CFRunLoopRunInMode(.defaultMode, 0.5, true)
                 }
+                group.cancelAll()
             }
         }
 
+        await self.shutdown()
         logger.info("Daemon stopped")
+    }
+
+    /// Sets up signal handlers and returns a pointer to a Bool that indicates shutdown
+    @MainActor
+    private func setupSignalHandling() -> UnsafeMutablePointer<Bool> {
+        let shouldStop = UnsafeMutablePointer<Bool>.allocate(capacity: 1)
+        shouldStop.pointee = false
+
+        signal(SIGTERM, SIG_IGN)
+        signal(SIGINT, SIG_IGN)
+
+        let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        termSource.setEventHandler {
+            Logger(label: "Daemon").info("Received SIGTERM, shutting down...")
+            shouldStop.pointee = true
+        }
+        termSource.resume()
+
+        let intSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+        intSource.setEventHandler {
+            Logger(label: "Daemon").info("Received SIGINT, shutting down...")
+            shouldStop.pointee = true
+        }
+        intSource.resume()
+
+        return shouldStop
     }
 
     private func handleProcessEvent(_ event: ProcessEvent) async {
@@ -86,13 +100,17 @@ public actor Daemon {
             geforceNowPid = pid
             logger.info("GeForce NOW detected, starting window monitor", metadata: ["pid": "\(pid)"])
 
+            // Cancel any existing window monitor task
+            windowMonitorTask?.cancel()
+
             // Start window monitoring in a new task
-            Task {
+            windowMonitorTask = Task {
                 let windowMonitor = WindowMonitor(pid: pid)
                 for await windowEvent in windowMonitor.events() {
+                    guard !Task.isCancelled else { break }
                     await self.handleWindowEvent(windowEvent)
                     // Stop if process is no longer tracked
-                    if await self.geforceNowPid != pid {
+                    if self.geforceNowPid != pid {
                         break
                     }
                 }
@@ -101,43 +119,45 @@ public actor Daemon {
         case .terminated(let pid):
             logger.info("GeForce NOW terminated", metadata: ["pid": "\(pid)"])
             geforceNowPid = nil
+            windowMonitorTask?.cancel()
+            windowMonitorTask = nil
 
             // If we were streaming, bring the interface back up
             if isStreaming {
                 isStreaming = false
-                await bringInterfaceUp()
+                bringInterfaceUp()
             }
         }
     }
 
-    private func handleWindowEvent(_ event: WindowEvent) async {
+    private func handleWindowEvent(_ event: WindowEvent) {
         switch event {
         case .streaming:
             guard !isStreaming else { return }
             isStreaming = true
             logger.info("Streaming detected (fullscreen), bringing awdl0 down")
-            await bringInterfaceDown()
+            bringInterfaceDown()
 
         case .notStreaming:
             guard isStreaming else { return }
             isStreaming = false
             logger.info("Streaming ended (not fullscreen), bringing awdl0 up")
-            await bringInterfaceUp()
+            bringInterfaceUp()
         }
     }
 
-    private func handleInterfaceEvent(_ event: InterfaceEvent) async {
+    private func handleInterfaceEvent(_ event: InterfaceEvent) {
         switch event {
         case .stateChanged(let isUp):
             // If awdl0 came back up while we're streaming, bring it back down
             if isUp && isStreaming {
                 logger.warning("awdl0 came back up during streaming, bringing it down again")
-                await bringInterfaceDown()
+                bringInterfaceDown()
             }
         }
     }
 
-    private func bringInterfaceDown() async {
+    private func bringInterfaceDown() {
         do {
             try interfaceController.bringDown()
         } catch {
@@ -145,7 +165,7 @@ public actor Daemon {
         }
     }
 
-    private func bringInterfaceUp() async {
+    private func bringInterfaceUp() {
         do {
             try interfaceController.bringUp()
         } catch {
@@ -153,33 +173,18 @@ public actor Daemon {
         }
     }
 
-    private func shutdown() async {
+    private func shutdown() {
         logger.info("Shutting down daemon...")
+        windowMonitorTask?.cancel()
 
         // Restore interface to up state
         if isStreaming {
             logger.info("Restoring awdl0 to up state before exit")
-            await bringInterfaceUp()
+            bringInterfaceUp()
         }
     }
-
-    /// Creates an AsyncStream that yields when SIGTERM or SIGINT is received
-    private static func signalStream() -> AsyncStream<Void> {
-        AsyncStream { continuation in
-            let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
-            termSource.setEventHandler {
-                continuation.yield()
-                continuation.finish()
-            }
-            termSource.resume()
-            signal(SIGTERM, SIG_IGN)
-
-            let intSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-            intSource.setEventHandler {
-                continuation.yield()
-                continuation.finish()
-            }
-            intSource.resume()
+}
+#endif
             signal(SIGINT, SIG_IGN)
 
             continuation.onTermination = { _ in

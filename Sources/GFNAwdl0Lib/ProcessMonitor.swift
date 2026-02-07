@@ -1,5 +1,5 @@
 #if os(macOS)
-import AppKit
+@preconcurrency import AppKit
 import Logging
 
 /// Events emitted by the ProcessMonitor
@@ -60,9 +60,11 @@ public struct ProcessMonitor: Sendable {
 
             logger.debug("Started monitoring for GeForce NOW process")
 
-            continuation.onTermination = { _ in
-                center.removeObserver(launchObserver)
-                center.removeObserver(terminateObserver)
+            continuation.onTermination = { @Sendable _ in
+                MainActor.assumeIsolated {
+                    center.removeObserver(launchObserver)
+                    center.removeObserver(terminateObserver)
+                }
                 logger.debug("Stopped monitoring for GeForce NOW process")
             }
         }

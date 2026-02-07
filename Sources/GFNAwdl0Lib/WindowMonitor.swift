@@ -76,7 +76,7 @@ public struct WindowMonitor: Sendable {
 
             // Use CGRect(dictionaryRepresentation:) for cleaner bounds extraction
             // kCGWindowBounds contains a CFDictionary that CGRect can parse directly
-            guard let boundsDict = window[kCGWindowBounds as String] as CFDictionary?,
+            guard let boundsDict = window[kCGWindowBounds as String] as? NSDictionary as CFDictionary?,
                   let windowBounds = CGRect(dictionaryRepresentation: boundsDict) else {
                 continue
             }

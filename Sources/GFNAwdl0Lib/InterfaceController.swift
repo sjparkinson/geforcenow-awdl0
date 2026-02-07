@@ -13,7 +13,7 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
     public var description: String {
         switch self {
         case .invalidInterfaceName(let name):
-            return "Invalid interface name: '\(name)' (max \(IFNAMSIZ - 1) characters)"
+            return "Invalid interface name: '\(name)' (max 15 characters)"
         case .socketCreationFailed(let errno):
             return "Failed to create socket: \(String(cString: strerror(errno)))"
         case .getInterfaceFlagsFailed(let errno):
@@ -28,25 +28,33 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
 
 /// Controls the state of a network interface using BSD sockets and ioctl.
 ///
-/// This uses standard POSIX/BSD interfaces available through Darwin:
-/// - `SIOCGIFFLAGS`: Get interface flags (defined in <sys/sockio.h>)
-/// - `SIOCSIFFLAGS`: Set interface flags (defined in <sys/sockio.h>)
-/// - `IFF_UP`: Interface is up flag (defined in <net/if.h>)
-/// - `IFNAMSIZ`: Max interface name length (defined in <net/if.h>)
+/// This uses standard POSIX/BSD interfaces:
+/// - `SIOCGIFFLAGS`: Get interface flags (from <sys/sockio.h>)
+/// - `SIOCSIFFLAGS`: Set interface flags (from <sys/sockio.h>)
+/// - `IFF_UP`: Interface is up flag (from <net/if.h>)
 ///
-/// Note: Bringing an interface down requires root privileges.
+/// Note: The ioctl codes are hardcoded because Swift doesn't bridge the C macros
+/// that depend on struct ifreq layout. These values are stable across macOS versions.
+///
+/// Bringing an interface down requires root privileges.
 public final class InterfaceController: Sendable {
-    // These constants come from Darwin SDK headers:
-    // - SIOCGIFFLAGS/SIOCSIFFLAGS: <sys/sockio.h> - ioctl codes for getting/setting interface flags
-    // - IFF_UP: <net/if.h> - the "interface is up" flag
-    // The ioctl codes are available via `import Darwin` in Swift.
+    // ioctl request codes from <sys/sockio.h>
+    // These are hardcoded because Swift can't bridge the _IOWR/_IOW macros that use struct ifreq
+    // Values: _IOWR('i', 17, struct ifreq) and _IOW('i', 16, struct ifreq)
+    private static let SIOCGIFFLAGS: UInt = 0xc020_6911  // get interface flags
+    private static let SIOCSIFFLAGS: UInt = 0x8020_6910  // set interface flags
+
+    // Interface flag from <net/if.h>
+    private static let IFF_UP: UInt16 = 0x1
+
+    // Maximum interface name length (IFNAMSIZ from <net/if.h> is 16, minus null terminator)
+    private static let maxInterfaceNameLength = 15
 
     private let logger = Logger(label: "InterfaceController")
     public let interfaceName: String
 
     public init(interfaceName: String = "awdl0") throws {
-        // IFNAMSIZ is defined in <net/if.h>, available via Darwin
-        guard interfaceName.count < IFNAMSIZ else {
+        guard interfaceName.count <= Self.maxInterfaceNameLength else {
             throw InterfaceError.invalidInterfaceName(interfaceName)
         }
         self.interfaceName = interfaceName
@@ -67,8 +75,7 @@ public final class InterfaceController: Sendable {
     /// Check if the interface is currently up
     public func isUp() throws -> Bool {
         let flags = try getInterfaceFlags()
-        // IFF_UP is defined in <net/if.h>, available via Darwin
-        return (flags & UInt16(IFF_UP)) != 0
+        return (flags & Self.IFF_UP) != 0
     }
 
     private func setInterfaceUp(_ up: Bool) throws {
@@ -81,22 +88,22 @@ public final class InterfaceController: Sendable {
         var ifr = ifreq()
         copyInterfaceName(to: &ifr)
 
-        // SIOCGIFFLAGS: get interface flags - from <sys/sockio.h>
-        guard ioctl(fd, SIOCGIFFLAGS, &ifr) == 0 else {
+        // Get current flags
+        guard ioctl(fd, Self.SIOCGIFFLAGS, &ifr) == 0 else {
             throw InterfaceError.getInterfaceFlagsFailed(errno)
         }
 
         // Modify the IFF_UP flag
         var flags = UInt16(bitPattern: ifr.ifr_ifru.ifru_flags)
         if up {
-            flags |= UInt16(IFF_UP)
+            flags |= Self.IFF_UP
         } else {
-            flags &= ~UInt16(IFF_UP)
+            flags &= ~Self.IFF_UP
         }
         ifr.ifr_ifru.ifru_flags = Int16(bitPattern: flags)
 
-        // SIOCSIFFLAGS: set interface flags - from <sys/sockio.h>
-        guard ioctl(fd, SIOCSIFFLAGS, &ifr) == 0 else {
+        // Set new flags
+        guard ioctl(fd, Self.SIOCSIFFLAGS, &ifr) == 0 else {
             throw InterfaceError.setInterfaceFlagsFailed(errno)
         }
 
@@ -116,7 +123,7 @@ public final class InterfaceController: Sendable {
         var ifr = ifreq()
         copyInterfaceName(to: &ifr)
 
-        guard ioctl(fd, SIOCGIFFLAGS, &ifr) == 0 else {
+        guard ioctl(fd, Self.SIOCGIFFLAGS, &ifr) == 0 else {
             throw InterfaceError.getInterfaceFlagsFailed(errno)
         }
 
@@ -124,11 +131,11 @@ public final class InterfaceController: Sendable {
     }
 
     private func copyInterfaceName(to ifr: inout ifreq) {
-        // ifr_name is a tuple of Int8 with IFNAMSIZ elements
+        // ifr_name is a tuple of Int8 with 16 elements (IFNAMSIZ)
         withUnsafeMutablePointer(to: &ifr.ifr_name) { ptr in
-            ptr.withMemoryRebound(to: Int8.self, capacity: Int(IFNAMSIZ)) { namePtr in
+            ptr.withMemoryRebound(to: Int8.self, capacity: 16) { namePtr in
                 _ = interfaceName.withCString { cString in
-                    strlcpy(namePtr, cString, Int(IFNAMSIZ))
+                    strlcpy(namePtr, cString, 16)
                 }
             }
         }
