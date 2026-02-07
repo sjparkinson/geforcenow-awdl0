@@ -33,23 +33,23 @@ sudo ./target/release/geforcenow-awdl0 install
 
 ```bash
 # Install and start the daemon (requires root)
-sudo geforcenow-awdl0 install
+sudo ./target/release/geforcenow-awdl0 install
 
 # Check daemon status
-sudo geforcenow-awdl0 status
+sudo ./target/release/geforcenow-awdl0 status
 
 # Uninstall the daemon (requires root)
-sudo geforcenow-awdl0 uninstall
+sudo ./target/release/geforcenow-awdl0 uninstall
 
 # Run the daemon manually (for debugging)
-sudo geforcenow-awdl0 run --verbose
+sudo ./target/release/geforcenow-awdl0 run --verbose
 ```
 
 ### Verifying It's Working
 
 ```bash
 # Check daemon status
-sudo geforcenow-awdl0 status
+sudo ./target/release/geforcenow-awdl0 status
 
 # View logs
 tail -f /var/log/geforcenow-awdl0/stdout.log
@@ -60,10 +60,13 @@ ifconfig awdl0
 
 ## How It Works
 
-1. The daemon subscribes to `NSWorkspaceDidLaunchApplicationNotification` and `NSWorkspaceDidTerminateApplicationNotification`
-2. When GeForce NOW (`com.nvidia.gfnpc.mall`) launches, it brings down `awdl0` using `ioctl` syscalls
-3. When GeForce NOW terminates, it allows `awdl0` to return to its normal state
-4. The daemon periodically verifies `awdl0` stays down while gaming (macOS may try to re-enable it)
+1. **Process monitoring**: Subscribes to `NSWorkspaceDidLaunchApplicationNotification` and `NSWorkspaceDidTerminateApplicationNotification` to detect when GeForce NOW (`com.nvidia.gfnpc.mall`) starts and stops.
+
+2. **Fullscreen detection**: When GeForce NOW is running, polls every 5 seconds using `CGWindowListCopyWindowInfo` to detect fullscreen windows (indicating an active game stream).
+
+3. **Interface control**: When streaming starts (fullscreen detected), brings down `awdl0` using `ioctl` syscalls. When streaming ends, allows `awdl0` back up.
+
+4. **Interface monitoring**: Uses `SCDynamicStore` to watch for `awdl0` state changes—if macOS re-enables `awdl0` during a stream, the daemon brings it back down.
 
 ## License
 
