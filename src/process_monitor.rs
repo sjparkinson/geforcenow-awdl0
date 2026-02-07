@@ -2,9 +2,15 @@
 //!
 //! This module provides event-driven monitoring for application launches and
 //! terminations on macOS, using `NSWorkspace` notifications rather than polling.
+//!
+//! Additionally, when the target application is running, it polls for fullscreen
+//! window state to detect when streaming starts and stops.
 
 use std::cell::RefCell;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::thread;
+use std::time::Duration;
 
 use block2::RcBlock;
 use objc2::rc::Retained;
@@ -17,6 +23,8 @@ use objc2_foundation::{
 };
 use thiserror::Error;
 use tracing::{debug, info, trace, warn};
+
+use crate::window_monitor;
 
 /// Errors that can occur during process monitoring.
 #[derive(Debug, Error)]
@@ -35,6 +43,10 @@ pub enum ProcessEvent {
     Launched { bundle_id: String, pid: i32 },
     /// The target application was terminated.
     Terminated { bundle_id: String, pid: i32 },
+    /// The target application entered fullscreen (streaming started).
+    StreamStarted { bundle_id: String, pid: i32 },
+    /// The target application exited fullscreen (streaming stopped).
+    StreamEnded { bundle_id: String, pid: i32 },
 }
 
 /// Callback type for process events.
@@ -58,12 +70,20 @@ impl Default for MonitorConfig {
 /// Process monitor that watches for application launches and terminations.
 ///
 /// Uses `NSWorkspace` notifications for event-driven monitoring (no polling).
+/// When the target application is running, polls for fullscreen state to detect
+/// streaming activity.
 pub struct ProcessMonitor {
     config: MonitorConfig,
     callback: EventCallback,
     /// Stored observers to ensure they stay alive.
     /// We use `RefCell` because observers are set up on the main thread.
     observers: RefCell<Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>>,
+    /// The PID of the currently running target application (0 if not running).
+    current_pid: Arc<AtomicI32>,
+    /// Whether the application is currently streaming (fullscreen).
+    is_streaming: Arc<AtomicBool>,
+    /// Flag to signal the polling thread to stop.
+    polling_active: Arc<AtomicBool>,
 }
 
 impl ProcessMonitor {
@@ -77,6 +97,9 @@ impl ProcessMonitor {
             config,
             callback,
             observers: RefCell::new(Vec::new()),
+            current_pid: Arc::new(AtomicI32::new(0)),
+            is_streaming: Arc::new(AtomicBool::new(false)),
+            polling_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -127,7 +150,25 @@ impl ProcessMonitor {
                         pid = pid,
                         "target application already running"
                     );
-                    (self.callback)(ProcessEvent::Launched { bundle_id, pid });
+
+                    // Store the PID
+                    self.current_pid.store(pid, Ordering::SeqCst);
+
+                    // Emit the Launched event
+                    (self.callback)(ProcessEvent::Launched {
+                        bundle_id: bundle_id.clone(),
+                        pid,
+                    });
+
+                    // Start the fullscreen polling thread
+                    start_fullscreen_polling(
+                        bundle_id,
+                        pid,
+                        Arc::clone(&self.callback),
+                        Arc::clone(&self.polling_active),
+                        Arc::clone(&self.is_streaming),
+                    );
+
                     return;
                 }
             }
@@ -168,11 +209,22 @@ impl ProcessMonitor {
     ) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
         let target_bundle_id = self.config.target_bundle_id.clone();
         let callback = Arc::clone(&self.callback);
+        let current_pid = Arc::clone(&self.current_pid);
+        let is_streaming = Arc::clone(&self.is_streaming);
+        let polling_active = Arc::clone(&self.polling_active);
 
         let block = RcBlock::new(move |notification: *mut NSNotification| {
             // SAFETY: The notification pointer is valid during the callback
             let notification = unsafe { &*notification };
-            handle_notification(notification, &target_bundle_id, &callback, is_launch);
+            handle_notification(
+                notification,
+                &target_bundle_id,
+                &callback,
+                &current_pid,
+                &is_streaming,
+                &polling_active,
+                is_launch,
+            );
         });
 
         let queue = NSOperationQueue::mainQueue();
@@ -200,6 +252,9 @@ fn handle_notification(
     notification: &NSNotification,
     target_bundle_id: &str,
     callback: &EventCallback,
+    current_pid: &Arc<AtomicI32>,
+    is_streaming: &Arc<AtomicBool>,
+    polling_active: &Arc<AtomicBool>,
     is_launch: bool,
 ) {
     let Some(user_info) = notification.userInfo() else {
@@ -239,11 +294,114 @@ fn handle_notification(
 
     if is_launch {
         info!(bundle_id = %bundle_id, pid = pid, "target application launched");
-        callback(ProcessEvent::Launched { bundle_id, pid });
+
+        // Store the PID
+        current_pid.store(pid, Ordering::SeqCst);
+
+        // Emit the Launched event
+        callback(ProcessEvent::Launched {
+            bundle_id: bundle_id.clone(),
+            pid,
+        });
+
+        // Start the fullscreen polling thread
+        start_fullscreen_polling(
+            bundle_id,
+            pid,
+            Arc::clone(callback),
+            Arc::clone(polling_active),
+            Arc::clone(is_streaming),
+        );
     } else {
         info!(bundle_id = %bundle_id, pid = pid, "target application terminated");
+
+        // Stop the polling thread
+        polling_active.store(false, Ordering::SeqCst);
+
+        // If we were streaming, emit StreamEnded first
+        if is_streaming.swap(false, Ordering::SeqCst) {
+            info!(
+                bundle_id = %bundle_id,
+                pid = pid,
+                "streaming ended (application terminated)"
+            );
+            callback(ProcessEvent::StreamEnded {
+                bundle_id: bundle_id.clone(),
+                pid,
+            });
+        }
+
+        // Clear the PID
+        current_pid.store(0, Ordering::SeqCst);
+
+        // Emit the Terminated event
         callback(ProcessEvent::Terminated { bundle_id, pid });
     }
+}
+
+/// Start a background thread to poll for fullscreen window state.
+fn start_fullscreen_polling(
+    bundle_id: String,
+    pid: i32,
+    callback: EventCallback,
+    polling_active: Arc<AtomicBool>,
+    is_streaming: Arc<AtomicBool>,
+) {
+    /// Polling interval for checking fullscreen state (5 seconds).
+    const POLL_INTERVAL: Duration = Duration::from_secs(5);
+
+    polling_active.store(true, Ordering::SeqCst);
+
+    thread::spawn(move || {
+        debug!(pid = pid, "started fullscreen polling thread");
+
+        while polling_active.load(Ordering::SeqCst) {
+            thread::sleep(POLL_INTERVAL);
+
+            // Check if we should still be running
+            if !polling_active.load(Ordering::SeqCst) {
+                break;
+            }
+
+            let is_fullscreen = window_monitor::has_fullscreen_window(pid);
+            let was_streaming = is_streaming.load(Ordering::SeqCst);
+
+            if is_fullscreen && !was_streaming {
+                // Entered fullscreen - streaming started
+                info!(
+                    bundle_id = %bundle_id,
+                    pid = pid,
+                    "detected fullscreen window, streaming started"
+                );
+                is_streaming.store(true, Ordering::SeqCst);
+                callback(ProcessEvent::StreamStarted {
+                    bundle_id: bundle_id.clone(),
+                    pid,
+                });
+            } else if !is_fullscreen && was_streaming {
+                // Exited fullscreen - streaming ended
+                info!(
+                    bundle_id = %bundle_id,
+                    pid = pid,
+                    "fullscreen window closed, streaming ended"
+                );
+                is_streaming.store(false, Ordering::SeqCst);
+                callback(ProcessEvent::StreamEnded {
+                    bundle_id: bundle_id.clone(),
+                    pid,
+                });
+            } else {
+                trace!(
+                    pid = pid,
+                    is_fullscreen = is_fullscreen,
+                    was_streaming = was_streaming,
+                    "no streaming state change"
+                );
+            }
+        }
+
+        debug!(pid = pid, "fullscreen polling thread stopped");
+    });
 }
 
 /// Get the bundle identifier from an `NSRunningApplication`.

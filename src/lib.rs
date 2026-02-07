@@ -9,3 +9,4 @@ pub mod cli;
 pub mod interface_controller;
 pub mod interface_monitor;
 pub mod process_monitor;
+pub mod window_monitor;

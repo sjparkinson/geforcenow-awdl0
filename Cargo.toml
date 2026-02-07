@@ -57,6 +57,9 @@ nix = { version = "0.31", features = ["net", "ioctl"] }
 # SystemConfiguration framework for interface monitoring
 system-configuration = "0.7"
 
+# CoreGraphics for window monitoring
+core-graphics = "0.24"
+
 [dev-dependencies]
 tempfile = "3"
 

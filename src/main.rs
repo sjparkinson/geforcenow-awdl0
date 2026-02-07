@@ -26,6 +26,8 @@ mod interface_controller;
 mod interface_monitor;
 #[cfg(target_os = "macos")]
 mod process_monitor;
+#[cfg(target_os = "macos")]
+mod window_monitor;
 
 #[cfg(target_os = "macos")]
 use interface_controller::{InterfaceController, MacOsInterfaceController};
@@ -117,30 +119,53 @@ fn main() {
 #[cfg(target_os = "macos")]
 fn create_process_callback(
     controller: Arc<MacOsInterfaceController>,
-    gfn_running: Arc<AtomicBool>,
+    gfn_streaming: Arc<AtomicBool>,
 ) -> process_monitor::EventCallback {
     Arc::new(move |event| match event {
         ProcessEvent::Launched { bundle_id, pid } => {
             info!(
                 bundle_id = %bundle_id,
                 pid = pid,
-                "GeForce NOW launched, disabling awdl0"
+                "GeForce NOW launched"
             );
-
-            gfn_running.store(true, Ordering::SeqCst);
-
-            if let Err(e) = controller.bring_down(AWDL_INTERFACE) {
-                error!(error = %e, "failed to bring down awdl0");
-            }
+            // Don't disable awdl0 yet - wait for streaming to start
         }
         ProcessEvent::Terminated { bundle_id, pid } => {
             info!(
                 bundle_id = %bundle_id,
                 pid = pid,
-                "GeForce NOW terminated, allowing awdl0"
+                "GeForce NOW terminated"
             );
 
-            gfn_running.store(false, Ordering::SeqCst);
+            // Ensure streaming flag is cleared and awdl0 is allowed up
+            if gfn_streaming.swap(false, Ordering::SeqCst) {
+                // Was streaming, so allow awdl0 up
+                if let Err(e) = controller.allow_up(AWDL_INTERFACE) {
+                    error!(error = %e, "failed to allow awdl0 up");
+                }
+            }
+        }
+        ProcessEvent::StreamStarted { bundle_id, pid } => {
+            info!(
+                bundle_id = %bundle_id,
+                pid = pid,
+                "GeForce NOW streaming started, disabling awdl0"
+            );
+
+            gfn_streaming.store(true, Ordering::SeqCst);
+
+            if let Err(e) = controller.bring_down(AWDL_INTERFACE) {
+                error!(error = %e, "failed to bring down awdl0");
+            }
+        }
+        ProcessEvent::StreamEnded { bundle_id, pid } => {
+            info!(
+                bundle_id = %bundle_id,
+                pid = pid,
+                "GeForce NOW streaming ended, allowing awdl0"
+            );
+
+            gfn_streaming.store(false, Ordering::SeqCst);
 
             if let Err(e) = controller.allow_up(AWDL_INTERFACE) {
                 error!(error = %e, "failed to allow awdl0 up");
@@ -153,12 +178,12 @@ fn create_process_callback(
 #[cfg(target_os = "macos")]
 fn create_interface_callback(
     controller: Arc<MacOsInterfaceController>,
-    gfn_running: Arc<AtomicBool>,
+    gfn_streaming: Arc<AtomicBool>,
 ) -> interface_monitor::InterfaceEventCallback {
     Arc::new(move |event| match event {
         InterfaceEvent::StateChanged { interface } => {
-            // Only act if GeForce NOW is running
-            if gfn_running.load(Ordering::SeqCst) {
+            // Only act if GeForce NOW is streaming
+            if gfn_streaming.load(Ordering::SeqCst) {
                 // Check if awdl0 came back up
                 match controller.is_up(&interface) {
                     Ok(true) => {
@@ -180,7 +205,7 @@ fn create_interface_callback(
             } else {
                 debug!(
                     interface = %interface,
-                    "awdl0 state changed but GeForce NOW not running, ignoring"
+                    "awdl0 state changed but GeForce NOW not streaming, ignoring"
                 );
             }
         }
@@ -219,8 +244,8 @@ fn run_daemon() -> cli::Result<()> {
     // Create the interface controller
     let controller = Arc::new(MacOsInterfaceController::new());
 
-    // Track whether GeForce NOW is currently running
-    let gfn_running = Arc::new(AtomicBool::new(false));
+    // Track whether GeForce NOW is currently streaming
+    let gfn_streaming = Arc::new(AtomicBool::new(false));
 
     // Create and start the process monitor
     let config = MonitorConfig {
@@ -228,7 +253,7 @@ fn run_daemon() -> cli::Result<()> {
     };
 
     let process_callback =
-        create_process_callback(Arc::clone(&controller), Arc::clone(&gfn_running));
+        create_process_callback(Arc::clone(&controller), Arc::clone(&gfn_streaming));
     let monitor = ProcessMonitor::new(config, process_callback);
 
     if let Err(e) = monitor.start() {
@@ -240,7 +265,7 @@ fn run_daemon() -> cli::Result<()> {
 
     // Create and start the interface state monitor for faster re-down detection
     let interface_callback =
-        create_interface_callback(Arc::clone(&controller), Arc::clone(&gfn_running));
+        create_interface_callback(Arc::clone(&controller), Arc::clone(&gfn_streaming));
     let mut interface_monitor = InterfaceStateMonitor::new(AWDL_INTERFACE, interface_callback);
 
     if let Err(e) = interface_monitor.start() {
@@ -264,8 +289,8 @@ fn run_daemon() -> cli::Result<()> {
 
     info!("daemon shutting down");
 
-    // If GeForce NOW was running when we shut down, allow awdl0 back up
-    if gfn_running.load(Ordering::SeqCst) {
+    // If GeForce NOW was streaming when we shut down, allow awdl0 back up
+    if gfn_streaming.load(Ordering::SeqCst) {
         info!("allowing awdl0 up on shutdown");
         if let Err(e) = controller.allow_up(AWDL_INTERFACE) {
             warn!(error = %e, "failed to allow awdl0 up on shutdown");
