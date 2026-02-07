@@ -122,7 +122,7 @@ pub fn has_fullscreen_window(pid: i32) -> bool {
     false
 }
 
-/// Get a number value from a CFDictionary by string key.
+/// Get a number value from a `CFDictionary` by string key.
 fn get_dict_number(dict: &CFDictionary<CFString, CFNumber>, key: &str) -> Option<f64> {
     let cf_key = CFString::new(key);
     dict.find(&cf_key).and_then(|v| v.to_f64())

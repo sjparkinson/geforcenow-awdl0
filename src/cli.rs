@@ -17,7 +17,7 @@ pub const INSTALL_PATH: &str = "/usr/local/bin/geforcenow-awdl0";
 
 /// The path to the `LaunchDaemon` plist.
 #[cfg(target_os = "macos")]
-pub const PLIST_PATH: &str = "/Library/LaunchDaemons/com.geforcenow.awdl0.plist";
+pub const PLIST_PATH: &str = "/Library/LaunchDaemons/io.github.sjparkinson.geforcenow-awdl0.plist";
 
 /// The log directory for the daemon.
 #[cfg(target_os = "macos")]
@@ -198,7 +198,8 @@ pub fn status() {
 
 /// The `LaunchDaemon` plist content, embedded from resources at compile time.
 #[cfg(target_os = "macos")]
-const PLIST_CONTENT: &str = include_str!("../resources/com.geforcenow.awdl0.plist");
+const PLIST_CONTENT: &str =
+    include_str!("../resources/io.github.sjparkinson.geforcenow-awdl0.plist");
 
 /// Load the daemon using launchctl.
 #[cfg(target_os = "macos")]
@@ -271,9 +272,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_plist() {
-        let plist = generate_plist();
-        assert!(plist.contains("com.awdl0.manager"));
+    fn test_plist_content() {
+        let plist = PLIST_CONTENT;
+        assert!(plist.contains("io.github.sjparkinson.geforcenow-awdl0"));
         assert!(plist.contains(INSTALL_PATH));
         assert!(plist.contains("RunAtLoad"));
         assert!(plist.contains("KeepAlive"));
@@ -281,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_plist_is_valid_xml() {
-        let plist = generate_plist();
+        let plist = PLIST_CONTENT;
         // Basic XML validation - should start with XML declaration
         assert!(plist.starts_with("<?xml"));
         // Should have matching tags

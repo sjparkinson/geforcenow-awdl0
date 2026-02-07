@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.geforcenow.awdl0</string>
+    <string>io.github.sjparkinson.geforcenow-awdl0</string>
     
     <key>ProgramArguments</key>
     <array>
