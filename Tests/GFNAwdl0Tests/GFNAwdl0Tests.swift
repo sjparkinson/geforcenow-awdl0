@@ -51,6 +51,41 @@ struct WindowMonitorTests {
 @Suite("InterfaceController Tests")
 struct InterfaceControllerTests {
     #if os(macOS)
+    @Test("ioctl encoding constants match BSD values")
+    func ioctlEncodingConstants() {
+        // Verify the encoding constants from <sys/ioccom.h>
+        #expect(InterfaceController.IOC_OUT == 0x40000000)
+        #expect(InterfaceController.IOC_IN == 0x80000000)
+        #expect(InterfaceController.IOC_INOUT == 0xc0000000)
+        #expect(InterfaceController.IOCPARM_MASK == 0x1fff)
+    }
+
+    @Test("ioc() encodes ioctl request codes correctly")
+    func iocEncoding() {
+        // Test the encoding formula: inout | (len << 16) | (group << 8) | num
+        // Using a simple case: _IO('x', 1) with len=0
+        let simple = InterfaceController.ioc(0, UInt8(ascii: "x"), 1, 0)
+        #expect(simple == 0x7801)  // ('x' << 8) | 1 = (0x78 << 8) | 1
+
+        // _IOW('t', 42, 8 bytes) = IOC_IN | (8 << 16) | ('t' << 8) | 42
+        let iow = InterfaceController.ioc(InterfaceController.IOC_IN, UInt8(ascii: "t"), 42, 8)
+        #expect(iow == 0x8008_742a)
+    }
+
+    @Test("SIOCGIFFLAGS matches known BSD value")
+    func siocgifflags() {
+        // SIOCGIFFLAGS = _IOWR('i', 17, struct ifreq) = 0xc0206911
+        // This is the documented value from BSD systems
+        #expect(InterfaceController.SIOCGIFFLAGS == 0xc020_6911)
+    }
+
+    @Test("SIOCSIFFLAGS matches known BSD value")
+    func siocsifflags() {
+        // SIOCSIFFLAGS = _IOW('i', 16, struct ifreq) = 0x80206910
+        // This is the documented value from BSD systems
+        #expect(InterfaceController.SIOCSIFFLAGS == 0x8020_6910)
+    }
+
     @Test("Default interface name is awdl0")
     func defaultInterfaceName() throws {
         let controller = try InterfaceController()

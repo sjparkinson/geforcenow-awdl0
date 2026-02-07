@@ -132,7 +132,7 @@ public actor Daemon {
             // If we were streaming, bring the interface back up
             if isStreaming {
                 isStreaming = false
-                bringInterfaceUp()
+                try? interfaceController.bringUp()
             }
         }
     }
@@ -143,13 +143,13 @@ public actor Daemon {
             guard !isStreaming else { return }
             isStreaming = true
             logger.info("Streaming detected (fullscreen), bringing awdl0 down")
-            bringInterfaceDown()
+            try? interfaceController.bringDown()
 
         case .notStreaming:
             guard isStreaming else { return }
             isStreaming = false
             logger.info("Streaming ended (not fullscreen), bringing awdl0 up")
-            bringInterfaceUp()
+            try? interfaceController.bringUp()
         }
     }
 
@@ -159,24 +159,8 @@ public actor Daemon {
             // If awdl0 came back up while we're streaming, bring it back down
             if isUp && isStreaming {
                 logger.warning("awdl0 came back up during streaming, bringing it down again")
-                bringInterfaceDown()
+                try? interfaceController.bringDown()
             }
-        }
-    }
-
-    private func bringInterfaceDown() {
-        do {
-            try interfaceController.bringDown()
-        } catch {
-            logger.error("Failed to bring interface down: \(error)")
-        }
-    }
-
-    private func bringInterfaceUp() {
-        do {
-            try interfaceController.bringUp()
-        } catch {
-            logger.error("Failed to bring interface up: \(error)")
         }
     }
 
@@ -187,7 +171,7 @@ public actor Daemon {
         // Restore interface to up state
         if isStreaming {
             logger.info("Restoring awdl0 to up state before exit")
-            bringInterfaceUp()
+            try? interfaceController.bringUp()
         }
     }
 }

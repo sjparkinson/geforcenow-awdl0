@@ -38,13 +38,26 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
 ///
 /// Bringing an interface down requires root privileges.
 public final class InterfaceController: Sendable {
-    // ioctl request codes from <sys/sockio.h>
-    // These are hardcoded because Swift can't bridge the _IOWR/_IOW macros that use struct ifreq
-    // Values: _IOWR('i', 17, struct ifreq) and _IOW('i', 16, struct ifreq)
-    private static let SIOCGIFFLAGS: UInt = 0xc020_6911  // get interface flags
-    private static let SIOCSIFFLAGS: UInt = 0x8020_6910  // set interface flags
+    // ioctl encoding constants from <sys/ioccom.h>
+    // https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/ioccom.h
+    static let IOC_OUT: UInt = 0x40000000
+    static let IOC_IN: UInt = 0x80000000
+    static let IOC_INOUT: UInt = IOC_IN | IOC_OUT
+    static let IOCPARM_MASK: UInt = 0x1fff
+
+    /// Encodes an ioctl request code: _IOC(inout, group, num, len)
+    static func ioc(_ inout: UInt, _ group: UInt8, _ num: UInt8, _ len: Int) -> UInt {
+        inout | ((UInt(len) & IOCPARM_MASK) << 16) | (UInt(group) << 8) | UInt(num)
+    }
+
+    // ioctl request codes derived from <sys/sockio.h>
+    // SIOCSIFFLAGS = _IOW('i', 16, struct ifreq)
+    // SIOCGIFFLAGS = _IOWR('i', 17, struct ifreq)
+    static let SIOCSIFFLAGS = ioc(IOC_IN, UInt8(ascii: "i"), 16, MemoryLayout<ifreq>.size)
+    static let SIOCGIFFLAGS = ioc(IOC_INOUT, UInt8(ascii: "i"), 17, MemoryLayout<ifreq>.size)
 
     // Interface flag from <net/if.h>
+    // Source: https://github.com/apple-oss-distributions/xnu/blob/main/bsd/net/if.h
     private static let IFF_UP: UInt16 = 0x1
 
     // Maximum interface name length (IFNAMSIZ from <net/if.h> is 16, minus null terminator)
