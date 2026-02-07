@@ -6,7 +6,7 @@
 use std::ffi::CString;
 use std::os::fd::AsRawFd;
 
-use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
+use nix::sys::socket::{AddressFamily, SockFlag, SockType, socket};
 use thiserror::Error;
 use tracing::{debug, info, warn};
 

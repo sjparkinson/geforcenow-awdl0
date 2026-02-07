@@ -9,7 +9,7 @@ use std::sync::Arc;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{msg_send, ClassType};
+use objc2::{ClassType, msg_send};
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::{
     MainThreadMarker, NSNotification, NSNotificationCenter, NSObjectProtocol, NSOperationQueue,
