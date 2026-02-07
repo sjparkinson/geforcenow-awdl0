@@ -6,6 +6,6 @@
 #![cfg(target_os = "macos")]
 
 pub mod cli;
-pub mod interface;
+pub mod interface_controller;
 pub mod interface_monitor;
-pub mod monitor;
+pub mod process_monitor;

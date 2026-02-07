@@ -21,18 +21,18 @@ use tracing::{debug, error, info, warn};
 
 mod cli;
 #[cfg(target_os = "macos")]
-mod interface;
+mod interface_controller;
 #[cfg(target_os = "macos")]
 mod interface_monitor;
 #[cfg(target_os = "macos")]
-mod monitor;
+mod process_monitor;
 
 #[cfg(target_os = "macos")]
-use interface::{InterfaceController, MacOsInterfaceController};
+use interface_controller::{InterfaceController, MacOsInterfaceController};
 #[cfg(target_os = "macos")]
 use interface_monitor::{InterfaceEvent, InterfaceStateMonitor};
 #[cfg(target_os = "macos")]
-use monitor::{MonitorConfig, ProcessEvent, ProcessMonitor};
+use process_monitor::{MonitorConfig, ProcessEvent, ProcessMonitor};
 
 /// The network interface to control.
 #[cfg(target_os = "macos")]
@@ -118,7 +118,7 @@ fn main() {
 fn create_process_callback(
     controller: Arc<MacOsInterfaceController>,
     gfn_running: Arc<AtomicBool>,
-) -> monitor::EventCallback {
+) -> process_monitor::EventCallback {
     Arc::new(move |event| match event {
         ProcessEvent::Launched { bundle_id, pid } => {
             info!(

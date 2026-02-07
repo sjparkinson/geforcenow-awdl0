@@ -4,7 +4,7 @@ Prevent Apple Wireless Direct Link (awdl0) from becoming active while GeForce NO
 
 ## The Problem
 
-On macOS, the `awdl0` interface (Apple Wireless Direct Link) is used for AirDrop, AirPlay, and other peer-to-peer wireless features. When active, it can cause latency spikes and network instability that interfere with cloud gaming services like GeForce NOW.
+On macOS, the `awdl0` interface (Apple Wireless Direct Link) is used for AirDrop, AirPlay, and other peer-to-peer wireless features. When active, it can cause latency when swapping channels that interferes with cloud gaming services like GeForce NOW.
 
 ## The Solution
 

@@ -10,7 +10,7 @@ use std::sync::Arc;
 /// Test that the process monitor can be created and configured.
 #[test]
 fn test_monitor_config_creation() {
-    use geforcenow_awdl0::monitor::MonitorConfig;
+    use geforcenow_awdl0::process_monitor::MonitorConfig;
 
     let config = MonitorConfig {
         target_bundle_id: "com.test.app".to_string(),
@@ -22,7 +22,7 @@ fn test_monitor_config_creation() {
 /// Test that the monitor default config is for `GeForce NOW`.
 #[test]
 fn test_monitor_default_config() {
-    use geforcenow_awdl0::monitor::MonitorConfig;
+    use geforcenow_awdl0::process_monitor::MonitorConfig;
 
     let config = MonitorConfig::default();
     assert_eq!(config.target_bundle_id, "com.nvidia.gfnpc.mall");
@@ -31,7 +31,7 @@ fn test_monitor_default_config() {
 /// Test process event types.
 #[test]
 fn test_process_events() {
-    use geforcenow_awdl0::monitor::ProcessEvent;
+    use geforcenow_awdl0::process_monitor::ProcessEvent;
 
     let launch_event = ProcessEvent::Launched {
         bundle_id: "com.test.app".to_string(),
@@ -56,7 +56,7 @@ fn test_process_events() {
 /// Test that the interface controller can be created.
 #[test]
 fn test_interface_controller_creation() {
-    use geforcenow_awdl0::interface::MacOsInterfaceController;
+    use geforcenow_awdl0::interface_controller::MacOsInterfaceController;
 
     let _controller = MacOsInterfaceController::new();
     // Just verify it can be created
@@ -65,7 +65,7 @@ fn test_interface_controller_creation() {
 /// Test interface name validation.
 #[test]
 fn test_interface_name_validation() {
-    use geforcenow_awdl0::interface::{InterfaceController, MacOsInterfaceController};
+    use geforcenow_awdl0::interface_controller::{InterfaceController, MacOsInterfaceController};
 
     let controller = MacOsInterfaceController::new();
 
@@ -78,7 +78,7 @@ fn test_interface_name_validation() {
 /// Test callback invocation tracking.
 #[test]
 fn test_callback_tracking() {
-    use geforcenow_awdl0::monitor::{EventCallback, MonitorConfig, ProcessMonitor};
+    use geforcenow_awdl0::process_monitor::{EventCallback, MonitorConfig, ProcessMonitor};
 
     let call_count = Arc::new(AtomicU32::new(0));
     let call_count_clone = Arc::clone(&call_count);
