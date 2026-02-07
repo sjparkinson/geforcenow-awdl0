@@ -60,8 +60,15 @@ public enum Installer {
         // Make binary executable
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binaryPath)
 
+        // Ad-hoc code sign the binary (required for Apple Silicon)
+        let signResult = shell("codesign", "-s", "-", "-f", binaryPath)
+        if signResult != 0 {
+            print("Warning: Failed to code sign binary (exit code \(signResult))")
+        }
+
         if verbose {
             print("  Copied binary to \(binaryPath)")
+            print("  Code signed binary (ad-hoc)")
         }
 
         // Write plist
@@ -72,8 +79,8 @@ public enum Installer {
             print("  Wrote plist to \(plistPath)")
         }
 
-        // Load the daemon
-        let loadResult = shell("launchctl", "load", "-w", plistPath)
+        // Load the daemon using modern launchctl syntax
+        let loadResult = shell("launchctl", "bootstrap", "system", plistPath)
         if loadResult != 0 {
             print("Warning: Failed to load daemon (exit code \(loadResult))")
         }
@@ -92,13 +99,13 @@ public enum Installer {
 
         print("Uninstalling geforcenow-awdl0...")
 
-        // Unload the daemon
-        if FileManager.default.fileExists(atPath: plistPath) {
-            let unloadResult = shell("launchctl", "unload", "-w", plistPath)
-            if verbose {
-                print("  Unloaded daemon (exit code \(unloadResult))")
-            }
+        // Unload the daemon using modern launchctl syntax
+        let unloadResult = shell("launchctl", "bootout", "system/\(launchctlLabel)")
+        if verbose {
+            print("  Unloaded daemon (exit code \(unloadResult))")
+        }
 
+        if FileManager.default.fileExists(atPath: plistPath) {
             try FileManager.default.removeItem(atPath: plistPath)
             if verbose {
                 print("  Removed \(plistPath)")
@@ -128,7 +135,7 @@ public enum Installer {
             print("  Installed: Yes")
 
             // Check if running via launchctl
-            let listResult = shellOutput("launchctl", "list", launchctlLabel)
+            let listResult = shellOutput("launchctl", "print", "system/\(launchctlLabel)")
             if listResult.exitCode == 0 {
                 print("  Running: Yes")
                 if verbose {
