@@ -24,7 +24,15 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Build
-        run: swift build
+        run: swift build -c release
 
-      - name: Run tests
+      - name: Test
         run: swift test
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geforcenow-awdl0-macos-arm64
+          path: |
+            .build/release/geforcenow-awdl0
+
