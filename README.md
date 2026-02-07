@@ -10,21 +10,38 @@ On macOS, the `awdl0` interface (Apple Wireless Direct Link) is used for AirDrop
 
 This daemon monitors for the GeForce NOW application and automatically:
 
-- **Brings down `awdl0`** when GeForce NOW launches
-- **Allows `awdl0` back up** when GeForce NOW terminates
+- **Brings down `awdl0`** when streaming starts (fullscreen detected)
+- **Allows `awdl0` back up** when streaming ends or GeForce NOW terminates
+- **Re-downs `awdl0`** if macOS re-enables it during streaming
+
+## Requirements
+
+- macOS 13.0 (Ventura) or later
+- Swift 6.0+ (for building from source)
 
 ## Installation
 
+### From Release Binary
+
+Download the latest release from the [Releases](https://github.com/sjparkinson/geforcenow-awdl0/releases) page:
+
+```bash
+# Download and install
+sudo ./geforcenow-awdl0 install
+```
+
+### From Source
+
 ```bash
 # Clone the repository
-git clone https://github.com/sjparkinson/awdl0.git
-cd awdl0
+git clone https://github.com/sjparkinson/geforcenow-awdl0.git
+cd geforcenow-awdl0
 
 # Build the release binary
-cargo build --release
+swift build -c release
 
 # Install the daemon
-sudo ./target/release/geforcenow-awdl0 install
+sudo .build/release/geforcenow-awdl0 install
 ```
 
 ## Usage
@@ -33,26 +50,43 @@ sudo ./target/release/geforcenow-awdl0 install
 
 ```bash
 # Install and start the daemon (requires root)
-sudo ./target/release/geforcenow-awdl0 install
+sudo .build/release/geforcenow-awdl0 install
 
 # Check daemon status
-sudo ./target/release/geforcenow-awdl0 status
+geforcenow-awdl0 status
 
 # Uninstall the daemon (requires root)
-sudo ./target/release/geforcenow-awdl0 uninstall
+sudo geforcenow-awdl0 uninstall
 
 # Run the daemon manually (for debugging)
-sudo ./target/release/geforcenow-awdl0 run --verbose
+sudo geforcenow-awdl0 run --verbose
+```
+
+### Options
+
+```
+USAGE: geforcenow-awdl0 [--verbose] <subcommand>
+
+OPTIONS:
+  -v, --verbose           Enable verbose logging.
+  -h, --help              Show help information.
+  --version               Show the version.
+
+SUBCOMMANDS:
+  run                     Run the daemon (typically invoked by launchd).
+  install                 Install the daemon (requires root).
+  uninstall               Uninstall the daemon (requires root).
+  status                  Show daemon status.
 ```
 
 ### Verifying It's Working
 
 ```bash
 # Check daemon status
-sudo ./target/release/geforcenow-awdl0 status
+geforcenow-awdl0 status
 
 # View logs
-tail -f /var/log/geforcenow-awdl0/stdout.log
+tail -f /var/log/geforcenow-awdl0/stderr.log
 
 # Check awdl0 interface status
 ifconfig awdl0
@@ -60,13 +94,28 @@ ifconfig awdl0
 
 ## How It Works
 
-1. **Process monitoring**: Subscribes to `NSWorkspaceDidLaunchApplicationNotification` and `NSWorkspaceDidTerminateApplicationNotification` to detect when GeForce NOW (`com.nvidia.gfnpc.mall`) starts and stops.
+1. **Process monitoring**: Subscribes to `NSWorkspace.didLaunchApplicationNotification` and `didTerminateApplicationNotification` to detect when GeForce NOW (`com.nvidia.gfnpc.mall`) starts and stops.
 
 2. **Fullscreen detection**: When GeForce NOW is running, polls every 5 seconds using `CGWindowListCopyWindowInfo` to detect fullscreen windows (indicating an active game stream).
 
 3. **Interface control**: When streaming starts (fullscreen detected), brings down `awdl0` using `ioctl` syscalls. When streaming ends, allows `awdl0` back up.
 
 4. **Interface monitoring**: Uses `SCDynamicStore` to watch for `awdl0` state changes—if macOS re-enables `awdl0` during a stream, the daemon brings it back down.
+
+## Development
+
+The project uses Swift Package Manager. A devcontainer configuration is provided for development in VS Code or GitHub Codespaces (note: builds require macOS, the devcontainer provides syntax highlighting and LSP support only).
+
+```bash
+# Build debug
+swift build
+
+# Build release
+swift build -c release
+
+# Run tests
+swift test
+```
 
 ## License
 
@@ -75,4 +124,5 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ## Acknowledgments
 
 - Inspired by the community workarounds for GeForce NOW latency issues on macOS
-- Built with [objc2](https://github.com/madsmtm/objc2) for safe Rust-Objective-C interop
+- Built with Swift using Apple's native frameworks: AppKit, CoreGraphics, SystemConfiguration
+
