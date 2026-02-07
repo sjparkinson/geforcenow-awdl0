@@ -29,8 +29,10 @@ cd geforcenow-awdl0
 # Build the release binary
 swift build -c release
 
-# Install the daemon
-sudo .build/release/geforcenow-awdl0 install
+# Install (per-user LaunchAgent)
+# The installer copies the binary to `~/bin/geforcenow-awdl0`, writes a LaunchAgent
+# to `~/Library/LaunchAgents/` and logs to `~/Library/Logs/geforcenow-awdl0`.
+.build/release/geforcenow-awdl0 install
 ```
 
 ## Usage
@@ -38,44 +40,27 @@ sudo .build/release/geforcenow-awdl0 install
 ### Commands
 
 ```bash
-# Install and start the daemon (requires root)
-sudo .build/release/geforcenow-awdl0 install
+# Install and start the daemon
+.build/release/geforcenow-awdl0 install
 
 # Check daemon status
-geforcenow-awdl0 status
+.build/release/geforcenow-awdl0 status
 
-# Uninstall the daemon (requires root)
-sudo geforcenow-awdl0 uninstall
+# Uninstall the daemon
+.build/release/geforcenow-awdl0 uninstall
 
 # Run the daemon manually (for debugging)
-sudo geforcenow-awdl0 run --verbose
-```
-
-### Options
-
-```
-USAGE: geforcenow-awdl0 [--verbose] <subcommand>
-
-OPTIONS:
-  -v, --verbose           Enable verbose logging.
-  -h, --help              Show help information.
-  --version               Show the version.
-
-SUBCOMMANDS:
-  run                     Run the daemon (typically invoked by launchd).
-  install                 Install the daemon (requires root).
-  uninstall               Uninstall the daemon (requires root).
-  status                  Show daemon status.
+.build/release/geforcenow-awdl0 run --verbose
 ```
 
 ### Verifying It's Working
 
 ```bash
 # Check daemon status
-geforcenow-awdl0 status
+.build/release/geforcenow-awdl0 status
 
 # View logs
-tail -f /var/log/geforcenow-awdl0/stderr.log
+tail -f ~/Library/Logs/geforcenow-awdl0/stderr.log
 
 # Check awdl0 interface status
 ifconfig awdl0

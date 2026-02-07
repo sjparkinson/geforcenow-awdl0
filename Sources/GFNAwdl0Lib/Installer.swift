@@ -6,16 +6,19 @@ public enum Installer {
     private static let plistPath = "/Library/LaunchDaemons/io.github.sjparkinson.geforcenow-awdl0.plist"
     private static let launchctlLabel = "io.github.sjparkinson.geforcenow-awdl0"
 
-    private static let plistContent = """
+    private static func plistContent(programPath: String, stdoutPath: String, stderrPath: String) -> String {
+        return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>io.github.sjparkinson.geforcenow-awdl0</string>
+            <string>
+                \(launchctlLabel)
+            </string>
             <key>ProgramArguments</key>
             <array>
-                <string>/usr/local/bin/geforcenow-awdl0</string>
+                <string>\(programPath)</string>
                 <string>run</string>
             </array>
             <key>RunAtLoad</key>
@@ -27,115 +30,103 @@ public enum Installer {
             <key>ThrottleInterval</key>
             <integer>5</integer>
             <key>StandardOutPath</key>
-            <string>/var/log/geforcenow-awdl0/stdout.log</string>
+            <string>\(stdoutPath)</string>
             <key>StandardErrorPath</key>
-            <string>/var/log/geforcenow-awdl0/stderr.log</string>
+            <string>\(stderrPath)</string>
         </dict>
         </plist>
         """
+    }
 
-    /// Install the daemon (requires root)
+    /// Install as a per-user LaunchAgent.
     public static func install(verbose: Bool) throws {
-        guard getuid() == 0 else {
-            throw InstallerError.rootRequired
-        }
-
-        print("Installing geforcenow-awdl0...")
+        print("Installing geforcenow-awdl0 (per-user)...")
 
         // Get path to current executable
         guard let executablePath = Bundle.main.executablePath else {
             throw InstallerError.executableNotFound
         }
 
-        // Create log directory
-        let logDir = "/var/log/geforcenow-awdl0"
+        // Prepare user log and launch agent directories
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let logDir = home + "/Library/Logs/geforcenow-awdl0"
         try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
+        let agentsDir = home + "/Library/LaunchAgents"
+        try? FileManager.default.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
 
-        // Copy binary to /usr/local/bin
-        if FileManager.default.fileExists(atPath: binaryPath) {
-            try FileManager.default.removeItem(atPath: binaryPath)
+        // Copy executable to ~/bin for a stable user install path
+        let userBin = home + "/bin"
+        try? FileManager.default.createDirectory(atPath: userBin, withIntermediateDirectories: true)
+        let installedBinary = userBin + "/geforcenow-awdl0"
+        if FileManager.default.fileExists(atPath: installedBinary) {
+            try? FileManager.default.removeItem(atPath: installedBinary)
         }
-        try FileManager.default.copyItem(atPath: executablePath, toPath: binaryPath)
+        try FileManager.default.copyItem(atPath: executablePath, toPath: installedBinary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installedBinary)
 
-        // Make binary executable
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binaryPath)
+        let programPath = installedBinary
+        let targetPlistPath = agentsDir + "/\(launchctlLabel).plist"
 
-        // Ad-hoc code sign the binary (required for Apple Silicon)
-        let signResult = shell("codesign", "-s", "-", "-f", binaryPath)
-        if signResult != 0 {
-            print("Warning: Failed to code sign binary (exit code \(signResult))")
-        }
+        // Write plist using user log paths
+        let content = plistContent(programPath: programPath, stdoutPath: logDir + "/stdout.log", stderrPath: logDir + "/stderr.log")
+        try content.write(toFile: targetPlistPath, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: targetPlistPath)
 
         if verbose {
-            print("  Copied binary to \(binaryPath)")
-            print("  Code signed binary (ad-hoc)")
+            print("  Wrote plist to \(targetPlistPath)")
+            print("  Using program path \(programPath)")
         }
 
-        // Write plist
-        try plistContent.write(toFile: plistPath, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: plistPath)
+        // Unload any existing registration first (ignore errors)
+        _ = shell("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
 
-        if verbose {
-            print("  Wrote plist to \(plistPath)")
-        }
-
-        // Load the daemon using modern launchctl syntax
-        let loadResult = shell("launchctl", "bootstrap", "system", plistPath)
+        // Load the agent for the current user
+        let loadResult = shell("launchctl", "bootstrap", "gui/\(getuid())", targetPlistPath)
         if loadResult != 0 {
-            print("Warning: Failed to load daemon (exit code \(loadResult))")
+            print("Warning: Failed to load agent (exit code \(loadResult))")
         }
 
         print("Installation complete!")
         print("")
-        print("The daemon is now running and will start automatically at boot.")
-        print("Use 'geforcenow-awdl0 status' to check the daemon status.")
+        print("The agent is now loaded for the current user and will start at login.")
+        print("Use 'geforcenow-awdl0 status' to check the agent status.")
     }
 
-    /// Uninstall the daemon (requires root)
+    /// Uninstall the per-user agent
     public static func uninstall(verbose: Bool) throws {
-        guard getuid() == 0 else {
-            throw InstallerError.rootRequired
-        }
+        print("Uninstalling geforcenow-awdl0 (per-user)...")
 
-        print("Uninstalling geforcenow-awdl0...")
-
-        // Unload the daemon using modern launchctl syntax
-        let unloadResult = shell("launchctl", "bootout", "system/\(launchctlLabel)")
+        // Unload the agent
+        let unloadResult = shell("launchctl", "bootout", "gui/\(getuid())/\(launchctlLabel)")
         if verbose {
-            print("  Unloaded daemon (exit code \(unloadResult))")
+            print("  Unloaded agent (exit code \(unloadResult))")
         }
 
-        if FileManager.default.fileExists(atPath: plistPath) {
-            try FileManager.default.removeItem(atPath: plistPath)
+        // Remove plist
+        let targetPlistPath = FileManager.default.homeDirectoryForCurrentUser.path + "/Library/LaunchAgents/\(launchctlLabel).plist"
+        if FileManager.default.fileExists(atPath: targetPlistPath) {
+            try FileManager.default.removeItem(atPath: targetPlistPath)
             if verbose {
-                print("  Removed \(plistPath)")
-            }
-        }
-
-        // Remove binary
-        if FileManager.default.fileExists(atPath: binaryPath) {
-            try FileManager.default.removeItem(atPath: binaryPath)
-            if verbose {
-                print("  Removed \(binaryPath)")
+                print("  Removed \(targetPlistPath)")
             }
         }
 
         print("Uninstallation complete!")
     }
 
-    /// Show daemon status
+    /// Show agent status
     public static func status(verbose: Bool) throws {
-        let binaryInstalled = FileManager.default.fileExists(atPath: binaryPath)
-        let plistInstalled = FileManager.default.fileExists(atPath: plistPath)
+        let plistToCheck = FileManager.default.homeDirectoryForCurrentUser.path + "/Library/LaunchAgents/\(launchctlLabel).plist"
+        let plistInstalled = FileManager.default.fileExists(atPath: plistToCheck)
 
         print("geforcenow-awdl0 status:")
         print("")
 
-        if binaryInstalled && plistInstalled {
+        if plistInstalled {
             print("  Installed: Yes")
 
-            // Check if running via launchctl
-            let listResult = shellOutput("launchctl", "print", "system/\(launchctlLabel)")
+            // Check if running via launchctl for the current user
+            let listResult = shellOutput("launchctl", "print", "gui/\(getuid())/\(launchctlLabel)")
             if listResult.exitCode == 0 {
                 print("  Running: Yes")
                 if verbose {
@@ -151,8 +142,7 @@ public enum Installer {
         } else {
             print("  Installed: No")
             if verbose {
-                print("  Binary: \(binaryInstalled ? "present" : "missing")")
-                print("  Plist: \(plistInstalled ? "present" : "missing")")
+                print("  Plist: missing")
             }
         }
     }
