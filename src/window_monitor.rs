@@ -3,11 +3,17 @@
 //! This module provides functionality to query window state for specific processes,
 //! including detecting fullscreen windows.
 
+// Use re-exported core-foundation types from system-configuration to avoid version conflicts
 use core_graphics::display::{
     CGDisplay, CGWindowListCopyWindowInfo, kCGNullWindowID, kCGWindowListExcludeDesktopElements,
     kCGWindowListOptionOnScreenOnly,
 };
 use core_graphics::window::{kCGWindowBounds, kCGWindowOwnerPID};
+use system_configuration::core_foundation::array::CFArray;
+use system_configuration::core_foundation::base::{CFType, TCFType};
+use system_configuration::core_foundation::dictionary::CFDictionary;
+use system_configuration::core_foundation::number::CFNumber;
+use system_configuration::core_foundation::string::CFString;
 use tracing::{debug, trace};
 
 /// Check if a process has any fullscreen windows.
@@ -36,38 +42,25 @@ pub fn has_fullscreen_window(pid: i32) -> bool {
 
     // Get all on-screen windows
     let options = kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements;
-    let window_list = match CGWindowListCopyWindowInfo(options, kCGNullWindowID) {
-        Some(list) => list,
-        None => {
-            debug!("failed to get window list");
-            return false;
-        }
-    };
+    let window_list_ptr = unsafe { CGWindowListCopyWindowInfo(options, kCGNullWindowID) };
 
-    let count =
-        unsafe { core_foundation::base::CFArrayGetCount(window_list.as_concrete_TypeRef()) };
+    if window_list_ptr.is_null() {
+        debug!("failed to get window list");
+        return false;
+    }
 
-    for i in 0..count {
-        let window_info = unsafe {
-            let ptr =
-                core_foundation::base::CFArrayGetValueAtIndex(window_list.as_concrete_TypeRef(), i);
-            if ptr.is_null() {
-                continue;
-            }
-            core_foundation::dictionary::CFDictionary::<
-                core_foundation::string::CFString,
-                core_foundation::base::CFType,
-            >::wrap_under_get_rule(ptr as *const _)
-        };
+    // SAFETY: We just checked the pointer is not null
+    let window_list: CFArray<CFDictionary<CFString, CFType>> =
+        unsafe { CFArray::wrap_under_create_rule(window_list_ptr) };
 
+    for window_info in window_list.iter() {
         // Get the window's owner PID
-        let window_pid = match window_info.find(unsafe { kCGWindowOwnerPID }) {
+        let pid_key = unsafe { CFString::wrap_under_get_rule(kCGWindowOwnerPID) };
+        let window_pid = match window_info.find(&pid_key) {
             Some(pid_ref) => {
-                let pid_number = unsafe {
-                    core_foundation::number::CFNumber::wrap_under_get_rule(
-                        pid_ref.as_concrete_TypeRef() as *const _,
-                    )
-                };
+                // SAFETY: kCGWindowOwnerPID values are always CFNumbers
+                let pid_number: CFNumber =
+                    unsafe { CFNumber::wrap_under_get_rule(pid_ref.as_concrete_TypeRef().cast()) };
                 pid_number.to_i32().unwrap_or(0)
             }
             None => continue,
@@ -79,15 +72,12 @@ pub fn has_fullscreen_window(pid: i32) -> bool {
         }
 
         // Get the window bounds
-        let bounds = match window_info.find(unsafe { kCGWindowBounds }) {
+        let bounds_key = unsafe { CFString::wrap_under_get_rule(kCGWindowBounds) };
+        let bounds = match window_info.find(&bounds_key) {
             Some(bounds_ref) => {
-                let bounds_dict = unsafe {
-                    core_foundation::dictionary::CFDictionary::<
-                        core_foundation::string::CFString,
-                        core_foundation::number::CFNumber,
-                    >::wrap_under_get_rule(
-                        bounds_ref.as_concrete_TypeRef() as *const _
-                    )
+                // SAFETY: kCGWindowBounds values are always CFDictionaries
+                let bounds_dict: CFDictionary<CFString, CFNumber> = unsafe {
+                    CFDictionary::wrap_under_get_rule(bounds_ref.as_concrete_TypeRef().cast())
                 };
 
                 let width = get_dict_number(&bounds_dict, "Width").unwrap_or(0.0);
@@ -133,20 +123,9 @@ pub fn has_fullscreen_window(pid: i32) -> bool {
 }
 
 /// Get a number value from a CFDictionary by string key.
-fn get_dict_number(
-    dict: &core_foundation::dictionary::CFDictionary<
-        core_foundation::string::CFString,
-        core_foundation::number::CFNumber,
-    >,
-    key: &str,
-) -> Option<f64> {
-    let cf_key = core_foundation::string::CFString::new(key);
-    dict.find(&cf_key).and_then(|v| {
-        let num = unsafe {
-            core_foundation::number::CFNumber::wrap_under_get_rule(v.as_concrete_TypeRef())
-        };
-        num.to_f64()
-    })
+fn get_dict_number(dict: &CFDictionary<CFString, CFNumber>, key: &str) -> Option<f64> {
+    let cf_key = CFString::new(key);
+    dict.find(&cf_key).and_then(|v: CFNumber| v.to_f64())
 }
 
 #[cfg(test)]

@@ -104,8 +104,7 @@ pub fn install() -> Result<()> {
     info!(path = INSTALL_PATH, "installed binary");
 
     // Write plist
-    let plist_content = generate_plist();
-    fs::write(PLIST_PATH, plist_content).map_err(CliError::WritePlist)?;
+    fs::write(PLIST_PATH, PLIST_CONTENT).map_err(CliError::WritePlist)?;
     info!(path = PLIST_PATH, "created LaunchDaemon plist");
 
     // Load the daemon
@@ -197,45 +196,9 @@ pub fn status() {
     println!("  GeForce NOW:  Run 'pgrep -f GeForceNOW' to check");
 }
 
-/// Generate the `LaunchDaemon` plist content.
+/// The `LaunchDaemon` plist content, embedded from resources at compile time.
 #[cfg(target_os = "macos")]
-fn generate_plist() -> String {
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.awdl0.manager</string>
-    
-    <key>ProgramArguments</key>
-    <array>
-        <string>{INSTALL_PATH}</string>
-        <string>run</string>
-    </array>
-    
-    <key>RunAtLoad</key>
-    <true/>
-    
-    <key>KeepAlive</key>
-    <true/>
-    
-    <key>ProcessType</key>
-    <string>Background</string>
-    
-    <key>StandardOutPath</key>
-    <string>{LOG_DIR}/stdout.log</string>
-    
-    <key>StandardErrorPath</key>
-    <string>{LOG_DIR}/stderr.log</string>
-    
-    <key>ThrottleInterval</key>
-    <integer>5</integer>
-</dict>
-</plist>
-"#
-    )
-}
+const PLIST_CONTENT: &str = include_str!("../resources/com.geforcenow.awdl0.plist");
 
 /// Load the daemon using launchctl.
 #[cfg(target_os = "macos")]

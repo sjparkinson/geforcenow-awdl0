@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.93.0"
 description = "Prevent Apple Wireless Direct Link from becoming active while GeForce NOW is running on macOS"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/sjparkinson/awdl0"
+repository = "https://github.com/sjparkinson/geforcenow-awdl0"
 readme = "README.md"
 keywords = ["macos", "awdl", "geforcenow", "networking"]
 categories = ["command-line-utilities"]
@@ -57,7 +57,7 @@ nix = { version = "0.31", features = ["net", "ioctl"] }
 # SystemConfiguration framework for interface monitoring
 system-configuration = "0.7"
 
-# CoreGraphics for window monitoring
+# CoreGraphics for window monitoring (uses core-foundation re-exported by system-configuration)
 core-graphics = "0.24"
 
 [dev-dependencies]
