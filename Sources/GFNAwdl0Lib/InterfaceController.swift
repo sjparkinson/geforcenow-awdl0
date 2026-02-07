@@ -46,8 +46,8 @@ public final class InterfaceController: Sendable {
     static let IOCPARM_MASK: UInt = 0x1fff
 
     /// Encodes an ioctl request code: _IOC(inout, group, num, len)
-    static func ioc(_ inout: UInt, _ group: UInt8, _ num: UInt8, _ len: Int) -> UInt {
-        inout | ((UInt(len) & IOCPARM_MASK) << 16) | (UInt(group) << 8) | UInt(num)
+    static func ioc(_ direction: UInt, _ group: UInt8, _ num: UInt8, _ len: Int) -> UInt {
+        direction | ((UInt(len) & IOCPARM_MASK) << 16) | (UInt(group) << 8) | UInt(num)
     }
 
     // ioctl request codes derived from <sys/sockio.h>
