@@ -1,4 +1,3 @@
-#if os(macOS)
 import Foundation
 
 /// Handles installation and uninstallation of the daemon
@@ -194,4 +193,3 @@ public enum InstallerError: Error, CustomStringConvertible, Sendable {
         }
     }
 }
-#endif

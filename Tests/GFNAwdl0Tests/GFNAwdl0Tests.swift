@@ -3,7 +3,6 @@ import Testing
 
 @Suite("ProcessMonitor Tests")
 struct ProcessMonitorTests {
-    #if os(macOS)
     @Test("Bundle ID constant is correct")
     func bundleIDConstant() {
         #expect(ProcessMonitor.geforceNowBundleID == "com.nvidia.gfnpc.mall")
@@ -21,12 +20,10 @@ struct ProcessMonitorTests {
     func canCreateMonitor() {
         _ = ProcessMonitor()
     }
-    #endif
 }
 
 @Suite("WindowMonitor Tests")
 struct WindowMonitorTests {
-    #if os(macOS)
     @Test("Polling interval is 5 seconds")
     func pollingInterval() {
         #expect(WindowMonitor.pollingInterval == .seconds(5))
@@ -43,12 +40,10 @@ struct WindowMonitorTests {
     func canCreateMonitor() {
         _ = WindowMonitor(pid: 1)
     }
-    #endif
 }
 
 @Suite("InterfaceController Tests")
 struct InterfaceControllerTests {
-    #if os(macOS)
     @Test("ioctl encoding constants match BSD values")
     func ioctlEncodingConstants() {
         // Verify the encoding constants from <sys/ioccom.h>
@@ -131,12 +126,10 @@ struct InterfaceControllerTests {
             #expect(!error.description.isEmpty)
         }
     }
-    #endif
 }
 
 @Suite("InterfaceMonitor Tests")
 struct InterfaceMonitorTests {
-    #if os(macOS)
     @Test("InterfaceEvent equality")
     func interfaceEventEquality() {
         #expect(InterfaceEvent.stateChanged(isUp: true) == InterfaceEvent.stateChanged(isUp: true))
@@ -165,22 +158,18 @@ struct InterfaceMonitorTests {
             #expect(!error.description.isEmpty)
         }
     }
-    #endif
 }
 
 @Suite("Daemon Tests")
 struct DaemonTests {
-    #if os(macOS)
     @Test("Can create Daemon")
     func canCreateDaemon() throws {
         _ = try Daemon()
     }
-    #endif
 }
 
 @Suite("Installer Tests")
 struct InstallerTests {
-    #if os(macOS)
     @Test("InstallerError descriptions")
     func errorDescriptions() {
         let errors: [InstallerError] = [
@@ -191,5 +180,4 @@ struct InstallerTests {
             #expect(!error.description.isEmpty)
         }
     }
-    #endif
 }

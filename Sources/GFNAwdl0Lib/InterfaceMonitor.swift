@@ -1,4 +1,3 @@
-#if os(macOS)
 import Logging
 import SystemConfiguration
 
@@ -116,4 +115,3 @@ public enum InterfaceMonitorError: Error, CustomStringConvertible, Sendable {
         }
     }
 }
-#endif

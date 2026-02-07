@@ -1,4 +1,3 @@
-#if os(macOS)
 import CoreGraphics
 import Foundation
 import Logging
@@ -100,4 +99,3 @@ public struct WindowMonitor: Sendable {
         return windowBounds.contains(contractedDisplay) && expandedDisplay.contains(windowBounds)
     }
 }
-#endif

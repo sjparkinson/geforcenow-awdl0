@@ -1,4 +1,3 @@
-#if os(macOS)
 import Dispatch
 import Foundation
 import Logging
@@ -175,4 +174,3 @@ public actor Daemon {
         }
     }
 }
-#endif

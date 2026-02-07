@@ -31,12 +31,8 @@ extension GFNAwdl0 {
                 return handler
             }
 
-            #if os(macOS)
             let daemon = try Daemon()
             try await daemon.run()
-            #else
-            print("This command only works on macOS")
-            #endif
         }
     }
 
@@ -48,11 +44,7 @@ extension GFNAwdl0 {
         @OptionGroup var options: GFNAwdl0
 
         mutating func run() throws {
-            #if os(macOS)
             try Installer.install(verbose: options.verbose)
-            #else
-            print("This command only works on macOS")
-            #endif
         }
     }
 
@@ -64,11 +56,7 @@ extension GFNAwdl0 {
         @OptionGroup var options: GFNAwdl0
 
         mutating func run() throws {
-            #if os(macOS)
             try Installer.uninstall(verbose: options.verbose)
-            #else
-            print("This command only works on macOS")
-            #endif
         }
     }
 
@@ -80,11 +68,7 @@ extension GFNAwdl0 {
         @OptionGroup var options: GFNAwdl0
 
         mutating func run() throws {
-            #if os(macOS)
             try Installer.status(verbose: options.verbose)
-            #else
-            print("This command only works on macOS")
-            #endif
         }
     }
 }

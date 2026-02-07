@@ -1,4 +1,3 @@
-#if os(macOS)
 @preconcurrency import AppKit
 import Logging
 
@@ -70,4 +69,3 @@ public struct ProcessMonitor: Sendable {
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if os(macOS)
 import Darwin
 import Logging
 
@@ -154,4 +153,3 @@ public final class InterfaceController: Sendable {
         }
     }
 }
-#endif

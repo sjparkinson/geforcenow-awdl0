@@ -12,8 +12,8 @@ let package = Package(
         .library(name: "GFNAwdl0Lib", targets: ["GFNAwdl0Lib"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0")
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.9.1")
     ],
     targets: [
         .executableTarget(
