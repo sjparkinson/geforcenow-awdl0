@@ -173,6 +173,7 @@ impl InterfaceStateMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     #[test]
     fn test_interface_event_equality() {
@@ -188,5 +189,76 @@ mod tests {
 
         assert_eq!(event1, event2);
         assert_ne!(event1, event3);
+    }
+
+    #[test]
+    fn test_interface_event_debug_format() {
+        let event = InterfaceEvent::StateChanged {
+            interface: "awdl0".to_string(),
+        };
+        let debug_str = format!("{event:?}");
+        assert!(debug_str.contains("StateChanged"));
+        assert!(debug_str.contains("awdl0"));
+    }
+
+    #[test]
+    fn test_interface_event_clone() {
+        let event = InterfaceEvent::StateChanged {
+            interface: "awdl0".to_string(),
+        };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn test_monitor_creation() {
+        let callback: InterfaceEventCallback = Arc::new(|_| {});
+        let monitor = InterfaceStateMonitor::new("awdl0", callback);
+
+        assert_eq!(monitor.interface, "awdl0");
+        assert!(monitor.store.is_none()); // Not started yet
+    }
+
+    #[test]
+    fn test_monitor_stores_interface_name() {
+        let callback: InterfaceEventCallback = Arc::new(|_| {});
+        let monitor = InterfaceStateMonitor::new("en0", callback);
+
+        assert_eq!(monitor.interface, "en0");
+    }
+
+    #[test]
+    fn test_callback_can_be_invoked() {
+        let call_count = Arc::new(AtomicU32::new(0));
+        let call_count_clone = Arc::clone(&call_count);
+
+        let callback: InterfaceEventCallback = Arc::new(move |_event| {
+            call_count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        // Invoke the callback directly
+        callback(InterfaceEvent::StateChanged {
+            interface: "awdl0".to_string(),
+        });
+
+        assert_eq!(call_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_monitor_error_display_store_creation() {
+        let error = InterfaceMonitorError::StoreCreation;
+        assert_eq!(error.to_string(), "failed to create dynamic store");
+    }
+
+    #[test]
+    fn test_monitor_error_display_notification_keys() {
+        let error = InterfaceMonitorError::SetNotificationKeys;
+        assert_eq!(error.to_string(), "failed to set notification keys");
+    }
+
+    #[test]
+    fn test_monitor_error_display_run_loop_source() {
+        let error = InterfaceMonitorError::RunLoopSource;
+        assert_eq!(error.to_string(), "failed to create run loop source");
     }
 }

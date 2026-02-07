@@ -419,7 +419,7 @@ fn get_process_identifier(app: &NSRunningApplication) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     #[test]
     fn test_monitor_config_default() {
@@ -428,7 +428,15 @@ mod tests {
     }
 
     #[test]
-    fn test_process_event_equality() {
+    fn test_monitor_config_custom() {
+        let config = MonitorConfig {
+            target_bundle_id: "com.custom.app".to_string(),
+        };
+        assert_eq!(config.target_bundle_id, "com.custom.app");
+    }
+
+    #[test]
+    fn test_process_event_launched_equality() {
         let event1 = ProcessEvent::Launched {
             bundle_id: "com.test.app".to_string(),
             pid: 123,
@@ -438,6 +446,98 @@ mod tests {
             pid: 123,
         };
         assert_eq!(event1, event2);
+    }
+
+    #[test]
+    fn test_process_event_terminated_equality() {
+        let event1 = ProcessEvent::Terminated {
+            bundle_id: "com.test.app".to_string(),
+            pid: 456,
+        };
+        let event2 = ProcessEvent::Terminated {
+            bundle_id: "com.test.app".to_string(),
+            pid: 456,
+        };
+        assert_eq!(event1, event2);
+    }
+
+    #[test]
+    fn test_process_event_stream_started_equality() {
+        let event1 = ProcessEvent::StreamStarted {
+            bundle_id: "com.test.app".to_string(),
+            pid: 789,
+        };
+        let event2 = ProcessEvent::StreamStarted {
+            bundle_id: "com.test.app".to_string(),
+            pid: 789,
+        };
+        assert_eq!(event1, event2);
+    }
+
+    #[test]
+    fn test_process_event_stream_ended_equality() {
+        let event1 = ProcessEvent::StreamEnded {
+            bundle_id: "com.test.app".to_string(),
+            pid: 101,
+        };
+        let event2 = ProcessEvent::StreamEnded {
+            bundle_id: "com.test.app".to_string(),
+            pid: 101,
+        };
+        assert_eq!(event1, event2);
+    }
+
+    #[test]
+    fn test_process_event_inequality_different_types() {
+        let launched = ProcessEvent::Launched {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        };
+        let terminated = ProcessEvent::Terminated {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        };
+        let stream_started = ProcessEvent::StreamStarted {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        };
+        let stream_ended = ProcessEvent::StreamEnded {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        };
+
+        assert_ne!(launched, terminated);
+        assert_ne!(launched, stream_started);
+        assert_ne!(launched, stream_ended);
+        assert_ne!(terminated, stream_started);
+        assert_ne!(terminated, stream_ended);
+        assert_ne!(stream_started, stream_ended);
+    }
+
+    #[test]
+    fn test_process_event_inequality_different_bundle_id() {
+        let event1 = ProcessEvent::Launched {
+            bundle_id: "com.app.one".to_string(),
+            pid: 123,
+        };
+        let event2 = ProcessEvent::Launched {
+            bundle_id: "com.app.two".to_string(),
+            pid: 123,
+        };
+        assert_ne!(event1, event2);
+    }
+
+    #[test]
+    fn test_process_event_inequality_different_pid() {
+        let event1 = ProcessEvent::Launched {
+            bundle_id: "com.test.app".to_string(),
+            pid: 100,
+        };
+        let event2 = ProcessEvent::Launched {
+            bundle_id: "com.test.app".to_string(),
+            pid: 200,
+        };
+        assert_ne!(event1, event2);
     }
 
     #[test]
@@ -452,5 +552,72 @@ mod tests {
 
         let monitor = ProcessMonitor::new(config.clone(), callback);
         assert_eq!(monitor.config.target_bundle_id, config.target_bundle_id);
+    }
+
+    #[test]
+    fn test_monitor_initial_state() {
+        let config = MonitorConfig::default();
+        let callback: EventCallback = Arc::new(|_| {});
+
+        let monitor = ProcessMonitor::new(config, callback);
+
+        // Initial state: not streaming, no PID, polling inactive
+        assert_eq!(monitor.current_pid.load(Ordering::SeqCst), 0);
+        assert!(!monitor.is_streaming.load(Ordering::SeqCst));
+        assert!(!monitor.polling_active.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_callback_receives_events() {
+        let config = MonitorConfig::default();
+        let event_count = Arc::new(AtomicU32::new(0));
+        let event_count_clone = Arc::clone(&event_count);
+
+        let callback: EventCallback = Arc::new(move |_event| {
+            event_count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        // Just verify the callback can be invoked
+        callback(ProcessEvent::Launched {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        });
+
+        assert_eq!(event_count.load(Ordering::SeqCst), 1);
+
+        callback(ProcessEvent::StreamStarted {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        });
+
+        assert_eq!(event_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn test_process_event_debug_format() {
+        let event = ProcessEvent::Launched {
+            bundle_id: "com.test.app".to_string(),
+            pid: 123,
+        };
+        let debug_str = format!("{event:?}");
+        assert!(debug_str.contains("Launched"));
+        assert!(debug_str.contains("com.test.app"));
+        assert!(debug_str.contains("123"));
+    }
+
+    #[test]
+    fn test_process_event_clone() {
+        let event = ProcessEvent::StreamStarted {
+            bundle_id: "com.test.app".to_string(),
+            pid: 456,
+        };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn test_monitor_error_display() {
+        let error = MonitorError::NotMainThread;
+        assert_eq!(error.to_string(), "not running on main thread");
     }
 }

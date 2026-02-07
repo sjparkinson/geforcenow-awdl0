@@ -53,6 +53,67 @@ fn test_process_events() {
     assert_ne!(launch_event, terminate_event);
 }
 
+/// Test streaming event types.
+#[test]
+fn test_streaming_events() {
+    use geforcenow_awdl0::process_monitor::ProcessEvent;
+
+    let stream_started = ProcessEvent::StreamStarted {
+        bundle_id: "com.nvidia.gfnpc.mall".to_string(),
+        pid: 1234,
+    };
+
+    let stream_ended = ProcessEvent::StreamEnded {
+        bundle_id: "com.nvidia.gfnpc.mall".to_string(),
+        pid: 1234,
+    };
+
+    // Same type and data should be equal
+    let stream_started2 = ProcessEvent::StreamStarted {
+        bundle_id: "com.nvidia.gfnpc.mall".to_string(),
+        pid: 1234,
+    };
+
+    assert_eq!(stream_started, stream_started2);
+    assert_ne!(stream_started, stream_ended);
+}
+
+/// Test full event lifecycle types.
+#[test]
+fn test_event_lifecycle_types() {
+    use geforcenow_awdl0::process_monitor::ProcessEvent;
+
+    let bundle_id = "com.nvidia.gfnpc.mall".to_string();
+    let pid = 5678;
+
+    // All four event types in a typical lifecycle
+    let events = vec![
+        ProcessEvent::Launched {
+            bundle_id: bundle_id.clone(),
+            pid,
+        },
+        ProcessEvent::StreamStarted {
+            bundle_id: bundle_id.clone(),
+            pid,
+        },
+        ProcessEvent::StreamEnded {
+            bundle_id: bundle_id.clone(),
+            pid,
+        },
+        ProcessEvent::Terminated {
+            bundle_id: bundle_id.clone(),
+            pid,
+        },
+    ];
+
+    // All events should be distinct
+    for i in 0..events.len() {
+        for j in (i + 1)..events.len() {
+            assert_ne!(events[i], events[j], "Events at {i} and {j} should differ");
+        }
+    }
+}
+
 /// Test that the interface controller can be created.
 #[test]
 fn test_interface_controller_creation() {
@@ -92,4 +153,120 @@ fn test_callback_tracking() {
 
     // Monitor created but not started, so callback shouldn't have been called
     assert_eq!(call_count.load(Ordering::SeqCst), 0);
+}
+
+/// Test interface monitor creation and configuration.
+#[test]
+fn test_interface_monitor_creation() {
+    use geforcenow_awdl0::interface_monitor::{InterfaceEventCallback, InterfaceStateMonitor};
+
+    let callback: InterfaceEventCallback = Arc::new(|_| {});
+    let monitor = InterfaceStateMonitor::new("awdl0", callback);
+
+    // Monitor created but not started
+    let _ = monitor;
+}
+
+/// Test interface event handling.
+#[test]
+fn test_interface_event_callback() {
+    use geforcenow_awdl0::interface_monitor::{InterfaceEvent, InterfaceEventCallback};
+
+    let received_events = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let received_events_clone = Arc::clone(&received_events);
+
+    let callback: InterfaceEventCallback = Arc::new(move |event| {
+        received_events_clone.lock().unwrap().push(event);
+    });
+
+    // Manually invoke the callback
+    callback(InterfaceEvent::StateChanged {
+        interface: "awdl0".to_string(),
+    });
+
+    let events = received_events.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0],
+        InterfaceEvent::StateChanged {
+            interface: "awdl0".to_string()
+        }
+    );
+}
+
+/// Test window monitor for non-existent process.
+#[test]
+fn test_window_monitor_no_fullscreen() {
+    use geforcenow_awdl0::window_monitor::has_fullscreen_window;
+
+    // A non-existent PID should return false
+    let result = has_fullscreen_window(999_999_999);
+    assert!(!result);
+}
+
+/// Test window monitor for current process (tests shouldn't be fullscreen).
+#[test]
+fn test_window_monitor_current_process() {
+    use geforcenow_awdl0::window_monitor::has_fullscreen_window;
+
+    // The test process itself shouldn't have a fullscreen window
+    let pid = std::process::id() as i32;
+    let result = has_fullscreen_window(pid);
+    assert!(!result);
+}
+
+/// Test that multiple monitors can coexist.
+#[test]
+fn test_multiple_monitors() {
+    use geforcenow_awdl0::interface_monitor::{InterfaceEventCallback, InterfaceStateMonitor};
+    use geforcenow_awdl0::process_monitor::{EventCallback, MonitorConfig, ProcessMonitor};
+
+    let process_callback: EventCallback = Arc::new(|_| {});
+    let interface_callback: InterfaceEventCallback = Arc::new(|_| {});
+
+    let config = MonitorConfig::default();
+    let _process_monitor = ProcessMonitor::new(config, process_callback);
+    let _interface_monitor = InterfaceStateMonitor::new("awdl0", interface_callback);
+
+    // Both monitors created successfully
+}
+
+/// Test event collection across multiple invocations.
+#[test]
+fn test_event_collection() {
+    use geforcenow_awdl0::process_monitor::{EventCallback, ProcessEvent};
+
+    let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let events_clone = Arc::clone(&events);
+
+    let callback: EventCallback = Arc::new(move |event| {
+        events_clone.lock().unwrap().push(event);
+    });
+
+    // Simulate a full lifecycle
+    callback(ProcessEvent::Launched {
+        bundle_id: "com.test.app".to_string(),
+        pid: 100,
+    });
+    callback(ProcessEvent::StreamStarted {
+        bundle_id: "com.test.app".to_string(),
+        pid: 100,
+    });
+    callback(ProcessEvent::StreamEnded {
+        bundle_id: "com.test.app".to_string(),
+        pid: 100,
+    });
+    callback(ProcessEvent::Terminated {
+        bundle_id: "com.test.app".to_string(),
+        pid: 100,
+    });
+
+    let collected = events.lock().unwrap();
+    assert_eq!(collected.len(), 4);
+
+    // Verify order
+    assert!(matches!(collected[0], ProcessEvent::Launched { .. }));
+    assert!(matches!(collected[1], ProcessEvent::StreamStarted { .. }));
+    assert!(matches!(collected[2], ProcessEvent::StreamEnded { .. }));
+    assert!(matches!(collected[3], ProcessEvent::Terminated { .. }));
 }

@@ -145,4 +145,44 @@ mod tests {
         let result = has_fullscreen_window(999_999_999);
         assert!(!result);
     }
+
+    #[test]
+    fn test_has_fullscreen_window_zero_pid() {
+        // PID 0 is the kernel, should have no user windows
+        let result = has_fullscreen_window(0);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_has_fullscreen_window_current_process() {
+        // The test process itself shouldn't have a fullscreen window
+        let pid = std::process::id() as i32;
+        let result = has_fullscreen_window(pid);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_main_display_bounds_valid() {
+        // Verify we can get main display bounds without crashing
+        let main_display = CGDisplay::main();
+        let bounds = main_display.bounds();
+
+        // Display should have positive dimensions
+        assert!(bounds.size.width > 0.0);
+        assert!(bounds.size.height > 0.0);
+    }
+
+    #[test]
+    fn test_window_list_returns_safely() {
+        // Verify CGWindowListCopyWindowInfo doesn't crash
+        let options = kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements;
+        let window_list_ptr = unsafe { CGWindowListCopyWindowInfo(options, kCGNullWindowID) };
+
+        // The pointer may be null or valid, but shouldn't crash
+        // If not null, we can safely wrap it
+        if !window_list_ptr.is_null() {
+            let _window_list: CFArray<CFDictionary<CFString, CFType>> =
+                unsafe { CFArray::wrap_under_create_rule(window_list_ptr) };
+        }
+    }
 }

@@ -263,4 +263,127 @@ mod tests {
         let result = MacOsInterfaceController::validate_name(&name);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_validate_name_one_over_max() {
+        let name = "a".repeat(16); // One over max
+        let result = MacOsInterfaceController::validate_name(&name);
+        assert!(matches!(result, Err(InterfaceError::NameTooLong(_))));
+    }
+
+    #[test]
+    fn test_validate_name_empty() {
+        let result = MacOsInterfaceController::validate_name("");
+        assert!(result.is_ok()); // Empty is technically valid for CString
+    }
+
+    #[test]
+    fn test_validate_name_awdl0() {
+        let result = MacOsInterfaceController::validate_name("awdl0");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_controller_creation() {
+        let controller = MacOsInterfaceController::new();
+        // Just verify it can be created
+        let _ = controller;
+    }
+
+    #[test]
+    fn test_controller_default() {
+        let controller = MacOsInterfaceController::default();
+        // Just verify default impl works
+        let _ = controller;
+    }
+
+    #[test]
+    fn test_create_socket() {
+        // Socket creation should succeed (doesn't require root)
+        let result = MacOsInterfaceController::create_socket();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_interface_error_display_socket() {
+        let error = InterfaceError::SocketCreation(nix::Error::EACCES);
+        let msg = error.to_string();
+        assert!(msg.contains("socket"));
+    }
+
+    #[test]
+    fn test_interface_error_display_name_too_long() {
+        let error = InterfaceError::NameTooLong("very_long_interface_name".to_string());
+        let msg = error.to_string();
+        assert!(msg.contains("too long"));
+        assert!(msg.contains("15"));
+    }
+
+    #[test]
+    fn test_interface_error_display_invalid_name() {
+        let error = InterfaceError::InvalidName("bad\0name".to_string());
+        let msg = error.to_string();
+        assert!(msg.contains("null"));
+    }
+
+    #[test]
+    fn test_interface_error_display_not_found() {
+        let error = InterfaceError::NotFound("nonexistent0".to_string());
+        let msg = error.to_string();
+        assert!(msg.contains("not found"));
+    }
+
+    #[test]
+    fn test_is_up_nonexistent_interface() {
+        let controller = MacOsInterfaceController::new();
+        let result = controller.is_up("nonexistent99");
+        // Should return NotFound error
+        assert!(matches!(result, Err(InterfaceError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_is_up_invalid_name() {
+        let controller = MacOsInterfaceController::new();
+        let long_name = "a".repeat(20);
+        let result = controller.is_up(&long_name);
+        assert!(matches!(result, Err(InterfaceError::NameTooLong(_))));
+    }
+
+    #[test]
+    fn test_bring_down_invalid_name() {
+        let controller = MacOsInterfaceController::new();
+        let long_name = "a".repeat(20);
+        let result = controller.bring_down(&long_name);
+        assert!(matches!(result, Err(InterfaceError::NameTooLong(_))));
+    }
+
+    #[test]
+    fn test_allow_up_invalid_name() {
+        let controller = MacOsInterfaceController::new();
+        let long_name = "a".repeat(20);
+        let result = controller.allow_up(&long_name);
+        assert!(matches!(result, Err(InterfaceError::NameTooLong(_))));
+    }
+
+    #[test]
+    fn test_ifreq_new_short_name() {
+        let name = std::ffi::CString::new("en0").unwrap();
+        let ifr = ifreq::new(&name);
+
+        // Verify the name was copied correctly
+        let ifr_name_bytes =
+            unsafe { std::slice::from_raw_parts(ifr.ifr_name.as_ptr().cast::<u8>(), 4) };
+        assert_eq!(ifr_name_bytes, b"en0\0");
+    }
+
+    #[test]
+    fn test_ifreq_new_max_length_name() {
+        let name = std::ffi::CString::new("a".repeat(15)).unwrap();
+        let ifr = ifreq::new(&name);
+
+        // Verify the name was copied (first few chars)
+        let ifr_name_bytes =
+            unsafe { std::slice::from_raw_parts(ifr.ifr_name.as_ptr().cast::<u8>(), 3) };
+        assert_eq!(ifr_name_bytes, b"aaa");
+    }
 }
