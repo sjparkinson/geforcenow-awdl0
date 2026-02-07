@@ -19,8 +19,7 @@ struct ProcessMonitorTests {
 
     @Test("Can create ProcessMonitor")
     func canCreateMonitor() {
-        let monitor = ProcessMonitor()
-        #expect(monitor != nil)
+        _ = ProcessMonitor()
     }
     #endif
 }
@@ -42,8 +41,7 @@ struct WindowMonitorTests {
 
     @Test("Can create WindowMonitor")
     func canCreateMonitor() {
-        let monitor = WindowMonitor(pid: 1)
-        #expect(monitor != nil)
+        _ = WindowMonitor(pid: 1)
     }
     #endif
 }
@@ -148,14 +146,12 @@ struct InterfaceMonitorTests {
 
     @Test("Can create InterfaceMonitor")
     func canCreateMonitor() {
-        let monitor = InterfaceMonitor()
-        #expect(monitor != nil)
+        _ = InterfaceMonitor()
     }
 
     @Test("Can create InterfaceMonitor with custom interface")
     func canCreateMonitorWithCustomInterface() {
-        let monitor = InterfaceMonitor(interfaceName: "en0")
-        #expect(monitor != nil)
+        _ = InterfaceMonitor(interfaceName: "en0")
     }
 
     @Test("InterfaceMonitorError descriptions")
@@ -177,8 +173,7 @@ struct DaemonTests {
     #if os(macOS)
     @Test("Can create Daemon")
     func canCreateDaemon() throws {
-        let daemon = try Daemon()
-        #expect(daemon != nil)
+        _ = try Daemon()
     }
     #endif
 }
