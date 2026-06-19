@@ -16,7 +16,7 @@ jobs:
     name: Build
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Cache Swift packages
         uses: actions/cache@v5
