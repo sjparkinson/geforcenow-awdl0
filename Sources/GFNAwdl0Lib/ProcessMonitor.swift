@@ -26,7 +26,7 @@ public struct ProcessMonitor: Sendable {
             func addObserver(
                 for name: Notification.Name,
                 message: Logger.Message,
-                event: @escaping (pid_t) -> ProcessEvent
+                event: @escaping @Sendable (pid_t) -> ProcessEvent
             ) -> NSObjectProtocol {
                 center.addObserver(forName: name, object: workspace, queue: .main) { notification in
                     guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
