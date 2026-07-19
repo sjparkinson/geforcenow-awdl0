@@ -69,6 +69,28 @@ struct WindowMonitorTests {
         let window = CGRect(x: 2, y: 2, width: 2556, height: 1436)
         #expect(!WindowMonitor.isFullscreen(windowBounds: window, displayBounds: display))
     }
+
+    @Test("Window filling a secondary display is fullscreen")
+    func fullscreenOnSecondaryDisplay() {
+        let main = CGRect(x: 0, y: 0, width: 2560, height: 1440)
+        let secondary = CGRect(x: 2560, y: 0, width: 1920, height: 1080)
+        let window = secondary
+        #expect(WindowMonitor.isFullscreen(windowBounds: window, displays: [main, secondary]))
+    }
+
+    @Test("Window matching no display is not fullscreen")
+    func fullscreenOnNoDisplay() {
+        let main = CGRect(x: 0, y: 0, width: 2560, height: 1440)
+        let secondary = CGRect(x: 2560, y: 0, width: 1920, height: 1080)
+        let window = CGRect(x: 100, y: 100, width: 1280, height: 720)
+        #expect(!WindowMonitor.isFullscreen(windowBounds: window, displays: [main, secondary]))
+    }
+
+    @Test("No active displays means nothing is fullscreen")
+    func noDisplays() {
+        let window = CGRect(x: 0, y: 0, width: 2560, height: 1440)
+        #expect(!WindowMonitor.isFullscreen(windowBounds: window, displays: []))
+    }
 }
 
 @Suite("InterfaceController Tests")

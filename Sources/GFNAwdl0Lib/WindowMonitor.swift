@@ -60,7 +60,7 @@ public struct WindowMonitor: Sendable {
     }
 
     private static func hasFullscreenWindow(pid: pid_t) -> Bool {
-        let mainDisplayBounds = CGDisplayBounds(CGMainDisplayID())
+        let displays = activeDisplayBounds()
 
         // CGWindowListCopyWindowInfo returns a CFArray of CFDictionary
         guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
@@ -81,12 +81,30 @@ public struct WindowMonitor: Sendable {
                 continue
             }
 
-            if isFullscreen(windowBounds: windowBounds, displayBounds: mainDisplayBounds) {
+            if isFullscreen(windowBounds: windowBounds, displays: displays) {
                 return true
             }
         }
 
         return false
+    }
+
+    private static func activeDisplayBounds() -> [CGRect] {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else {
+            return []
+        }
+
+        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &displays, &count) == .success else {
+            return []
+        }
+
+        return displays.prefix(Int(count)).map(CGDisplayBounds)
+    }
+
+    static func isFullscreen(windowBounds: CGRect, displays: [CGRect]) -> Bool {
+        displays.contains { isFullscreen(windowBounds: windowBounds, displayBounds: $0) }
     }
 
     static func isFullscreen(windowBounds: CGRect, displayBounds: CGRect) -> Bool {
