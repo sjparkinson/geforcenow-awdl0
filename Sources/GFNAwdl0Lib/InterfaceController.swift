@@ -7,7 +7,6 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
     case socketCreationFailed(Int32)
     case getInterfaceFlagsFailed(Int32)
     case setInterfaceFlagsFailed(Int32)
-    case interfaceNotFound(String)
 
     public var description: String {
         switch self {
@@ -19,8 +18,6 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
             return "Failed to get interface flags: \(String(cString: strerror(errno)))"
         case .setInterfaceFlagsFailed(let errno):
             return "Failed to set interface flags: \(String(cString: strerror(errno)))"
-        case .interfaceNotFound(let name):
-            return "Interface not found: '\(name)'"
         }
     }
 }

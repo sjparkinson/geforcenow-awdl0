@@ -170,8 +170,7 @@ struct InterfaceControllerTests {
             .invalidInterfaceName("test"),
             .socketCreationFailed(1),
             .getInterfaceFlagsFailed(2),
-            .setInterfaceFlagsFailed(3),
-            .interfaceNotFound("eth0")
+            .setInterfaceFlagsFailed(3)
         ]
         for error in errors {
             #expect(!error.description.isEmpty)
