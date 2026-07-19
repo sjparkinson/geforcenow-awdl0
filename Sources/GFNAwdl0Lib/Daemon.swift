@@ -2,20 +2,6 @@ import Dispatch
 import Foundation
 import Logging
 
-/// Holds the shutdown continuation and signal sources. Mutated only from the main queue.
-private final class ShutdownWaiter: @unchecked Sendable {
-    var continuation: CheckedContinuation<Void, Never>?
-    var termSource: DispatchSourceSignal?
-    var intSource: DispatchSourceSignal?
-
-    func signal() {
-        if let cont = continuation {
-            continuation = nil
-            cont.resume()
-        }
-    }
-}
-
 /// Abstraction over interface control so the daemon's state machine can be
 /// tested without root privileges.
 public protocol InterfaceControlling: Sendable {
@@ -33,9 +19,10 @@ public final class Daemon {
     private let interfaceController: any InterfaceControlling
     private let windowEvents: (pid_t) -> AsyncStream<WindowEvent>
 
-    private var geforceNowPid: pid_t?
     private var isStreaming = false
     private var windowMonitorTask: Task<Void, Never>?
+    private var shutdownContinuation: CheckedContinuation<Void, Never>?
+    private var signalSources: [DispatchSourceSignal] = []
 
     public init(
         interfaceController: any InterfaceControlling,
@@ -53,8 +40,7 @@ public final class Daemon {
     public func run() async throws {
         logger.info("Starting geforcenow-awdl0 daemon")
 
-        let waiter = ShutdownWaiter()
-        setupSignalHandling(waiter)
+        setupSignalHandling()
 
         reconcileInterfaceState()
 
@@ -81,7 +67,7 @@ public final class Daemon {
         }
 
         await withCheckedContinuation { continuation in
-            waiter.continuation = continuation
+            shutdownContinuation = continuation
         }
 
         processTask.cancel()
@@ -91,25 +77,24 @@ public final class Daemon {
         logger.info("Daemon stopped")
     }
 
-    private func setupSignalHandling(_ waiter: ShutdownWaiter) {
-        signal(SIGTERM, SIG_IGN)
-        signal(SIGINT, SIG_IGN)
+    private func setupSignalHandling() {
+        for (signalNumber, name) in [(SIGTERM, "SIGTERM"), (SIGINT, "SIGINT")] {
+            signal(signalNumber, SIG_IGN)
 
-        let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
-        termSource.setEventHandler { [waiter, logger] in
-            logger.info("Received SIGTERM, shutting down...")
-            waiter.signal()
+            let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+            source.setEventHandler {
+                // The source's queue is .main, so we're already on the main actor.
+                MainActor.assumeIsolated {
+                    self.logger.info("Received \(name), shutting down...")
+                    if let continuation = self.shutdownContinuation {
+                        self.shutdownContinuation = nil
+                        continuation.resume()
+                    }
+                }
+            }
+            source.resume()
+            signalSources.append(source)
         }
-        termSource.resume()
-        waiter.termSource = termSource
-
-        let intSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-        intSource.setEventHandler { [waiter, logger] in
-            logger.info("Received SIGINT, shutting down...")
-            waiter.signal()
-        }
-        intSource.resume()
-        waiter.intSource = intSource
     }
 
     /// A previous instance that crashed mid-stream leaves awdl0 down with
@@ -128,7 +113,6 @@ public final class Daemon {
     func handleProcessEvent(_ event: ProcessEvent) {
         switch event {
         case .launched(let pid):
-            geforceNowPid = pid
             logger.info("GeForce NOW detected, starting window monitor", metadata: ["pid": "\(pid)"])
 
             windowMonitorTask?.cancel()
@@ -136,15 +120,11 @@ public final class Daemon {
                 for await windowEvent in windowEvents(pid) {
                     guard !Task.isCancelled else { break }
                     self.handleWindowEvent(windowEvent)
-                    if self.geforceNowPid != pid {
-                        break
-                    }
                 }
             }
 
         case .terminated(let pid):
             logger.info("GeForce NOW terminated", metadata: ["pid": "\(pid)"])
-            geforceNowPid = nil
             windowMonitorTask?.cancel()
             windowMonitorTask = nil
 
