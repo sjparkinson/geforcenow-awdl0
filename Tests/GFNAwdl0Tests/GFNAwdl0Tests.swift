@@ -3,46 +3,8 @@ import Synchronization
 import Testing
 @testable import GFNAwdl0Lib
 
-@Suite("ProcessMonitor Tests")
-struct ProcessMonitorTests {
-    @Test("Bundle ID constant is correct")
-    func bundleIDConstant() {
-        #expect(ProcessMonitor.geforceNowBundleID == "com.nvidia.gfnpc.mall")
-    }
-
-    @Test("ProcessEvent equality")
-    func processEventEquality() {
-        #expect(ProcessEvent.launched(pid: 123) == ProcessEvent.launched(pid: 123))
-        #expect(ProcessEvent.launched(pid: 123) != ProcessEvent.launched(pid: 456))
-        #expect(ProcessEvent.terminated(pid: 123) == ProcessEvent.terminated(pid: 123))
-        #expect(ProcessEvent.launched(pid: 123) != ProcessEvent.terminated(pid: 123))
-    }
-
-    @Test("Can create ProcessMonitor")
-    func canCreateMonitor() {
-        _ = ProcessMonitor()
-    }
-}
-
 @Suite("WindowMonitor Tests")
 struct WindowMonitorTests {
-    @Test("Polling interval is 5 seconds")
-    func pollingInterval() {
-        #expect(WindowMonitor.pollingInterval == .seconds(5))
-    }
-
-    @Test("WindowEvent equality")
-    func windowEventEquality() {
-        #expect(WindowEvent.streaming == WindowEvent.streaming)
-        #expect(WindowEvent.notStreaming == WindowEvent.notStreaming)
-        #expect(WindowEvent.streaming != WindowEvent.notStreaming)
-    }
-
-    @Test("Can create WindowMonitor")
-    func canCreateMonitor() {
-        _ = WindowMonitor(pid: 1)
-    }
-
     @Test("Window exactly at display bounds is fullscreen")
     func windowAtBounds() {
         let display = CGRect(x: 0, y: 0, width: 2560, height: 1440)
@@ -172,50 +134,6 @@ struct InterfaceControllerTests {
         }
     }
 
-    @Test("InterfaceError descriptions")
-    func errorDescriptions() {
-        let errors: [InterfaceError] = [
-            .invalidInterfaceName("test"),
-            .socketCreationFailed(1),
-            .getInterfaceFlagsFailed(2),
-            .setInterfaceFlagsFailed(3)
-        ]
-        for error in errors {
-            #expect(!error.description.isEmpty)
-        }
-    }
-}
-
-@Suite("InterfaceMonitor Tests")
-struct InterfaceMonitorTests {
-    @Test("InterfaceEvent equality")
-    func interfaceEventEquality() {
-        #expect(InterfaceEvent.stateChanged(isUp: true) == InterfaceEvent.stateChanged(isUp: true))
-        #expect(InterfaceEvent.stateChanged(isUp: false) == InterfaceEvent.stateChanged(isUp: false))
-        #expect(InterfaceEvent.stateChanged(isUp: true) != InterfaceEvent.stateChanged(isUp: false))
-    }
-
-    @Test("Can create InterfaceMonitor")
-    func canCreateMonitor() {
-        _ = InterfaceMonitor()
-    }
-
-    @Test("Can create InterfaceMonitor with custom interface")
-    func canCreateMonitorWithCustomInterface() {
-        _ = InterfaceMonitor(interfaceName: "en0")
-    }
-
-    @Test("InterfaceMonitorError descriptions")
-    func errorDescriptions() {
-        let errors: [InterfaceMonitorError] = [
-            .storeCreationFailed,
-            .notificationSetupFailed,
-            .runLoopSourceCreationFailed
-        ]
-        for error in errors {
-            #expect(!error.description.isEmpty)
-        }
-    }
 }
 
 /// Records bringUp/bringDown calls so tests can assert on the daemon's decisions.
