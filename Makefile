@@ -5,7 +5,7 @@ UID := $(shell id -u)
 LABEL := io.github.sjparkinson.geforcenow-awdl0
 SRCS := $(shell find Sources -type f -name '*.swift')
 
-.PHONY: all install uninstall run test clean
+.PHONY: all build install uninstall run test clean
 
 all: $(BINARY)
 
@@ -19,6 +19,7 @@ install: build
 	@mkdir -p $(HOME)/bin
 	@mkdir -p $(HOME)/Library/LaunchAgents
 	@mkdir -p $(HOME)/Library/Logs
+	@launchctl bootout gui/$(UID)/$(LABEL) 2>/dev/null || true
 	@sudo cp $(BINARY) $(TARGET_BIN)
 	@sudo chown root:wheel $(TARGET_BIN)
 	@sudo chmod 4755 $(TARGET_BIN)
