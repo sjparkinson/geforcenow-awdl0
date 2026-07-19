@@ -11,7 +11,7 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
     public var description: String {
         switch self {
         case .invalidInterfaceName(let name):
-            return "Invalid interface name: '\(name)' (max 15 characters)"
+            return "Invalid interface name: '\(name)' (max 15 bytes)"
         case .socketCreationFailed(let errno):
             return "Failed to create socket: \(String(cString: strerror(errno)))"
         case .getInterfaceFlagsFailed(let errno):
@@ -63,7 +63,9 @@ public final class InterfaceController: Sendable {
     public let interfaceName: String
 
     public init(interfaceName: String = "awdl0") throws {
-        guard interfaceName.count <= Self.maxInterfaceNameLength else {
+        // Compare UTF-8 bytes, not characters: strlcpy copies bytes, so a
+        // multi-byte name could pass a character count and still truncate.
+        guard interfaceName.utf8.count <= Self.maxInterfaceNameLength else {
             throw InterfaceError.invalidInterfaceName(interfaceName)
         }
         self.interfaceName = interfaceName

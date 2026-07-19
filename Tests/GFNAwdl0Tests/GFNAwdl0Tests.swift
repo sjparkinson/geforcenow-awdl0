@@ -156,6 +156,14 @@ struct InterfaceControllerTests {
         #expect(controller.interfaceName == "123456789012345")
     }
 
+    @Test("Interface name over 15 UTF-8 bytes rejected even if under 15 characters")
+    func interfaceNameByteLengthRejected() {
+        // 8 characters, but 16 bytes of UTF-8 — strlcpy would truncate it
+        #expect(throws: InterfaceError.self) {
+            _ = try InterfaceController(interfaceName: "áéíóúàèì")
+        }
+    }
+
     @Test("Interface name at IFNAMSIZ rejected")
     func interfaceNameAtIFNAMSIZRejected() {
         // 16 characters should fail (IFNAMSIZ includes the null terminator)
