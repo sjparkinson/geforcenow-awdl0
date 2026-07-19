@@ -21,6 +21,7 @@ private final class ShutdownWaiter: @unchecked Sendable {
 public protocol InterfaceControlling: Sendable {
     func bringUp() throws
     func bringDown() throws
+    func isUp() throws -> Bool
 }
 
 extension InterfaceController: InterfaceControlling {}
@@ -54,6 +55,8 @@ public final class Daemon {
 
         let waiter = ShutdownWaiter()
         setupSignalHandling(waiter)
+
+        reconcileInterfaceState()
 
         let processMonitor = ProcessMonitor()
         let interfaceMonitor = InterfaceMonitor()
@@ -107,6 +110,19 @@ public final class Daemon {
         }
         intSource.resume()
         waiter.intSource = intSource
+    }
+
+    /// A previous instance that crashed mid-stream leaves awdl0 down with
+    /// nobody to restore it; launchd relaunches us, so bring it back up here.
+    func reconcileInterfaceState() {
+        do {
+            if try !interfaceController.isUp() {
+                logger.info("awdl0 was left down by a previous run, bringing it up")
+                bringInterfaceUp()
+            }
+        } catch {
+            logger.error("Failed to check awdl0 state at startup", metadata: ["error": "\(error)"])
+        }
     }
 
     func handleProcessEvent(_ event: ProcessEvent) {

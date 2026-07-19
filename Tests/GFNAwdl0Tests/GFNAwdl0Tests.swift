@@ -197,6 +197,7 @@ final class InterfaceControllerSpy: InterfaceControlling {
     }
 
     private let calls = Mutex<[Call]>([])
+    private let interfaceIsUp = Mutex<Bool>(true)
 
     var recordedCalls: [Call] {
         calls.withLock { $0 }
@@ -208,6 +209,14 @@ final class InterfaceControllerSpy: InterfaceControlling {
 
     func bringDown() throws {
         calls.withLock { $0.append(.down) }
+    }
+
+    func isUp() throws -> Bool {
+        interfaceIsUp.withLock { $0 }
+    }
+
+    func setInterfaceUp(_ up: Bool) {
+        interfaceIsUp.withLock { $0 = up }
     }
 }
 
@@ -273,6 +282,21 @@ struct DaemonTests {
         let daemon = makeDaemon()
         daemon.handleProcessEvent(.launched(pid: 42))
         daemon.handleProcessEvent(.terminated(pid: 42))
+        #expect(spy.recordedCalls.isEmpty)
+    }
+
+    @Test("Startup reconciliation restores an interface left down")
+    func reconciliationRestoresDownedInterface() {
+        spy.setInterfaceUp(false)
+        let daemon = makeDaemon()
+        daemon.reconcileInterfaceState()
+        #expect(spy.recordedCalls == [.up])
+    }
+
+    @Test("Startup reconciliation leaves a healthy interface alone")
+    func reconciliationLeavesHealthyInterfaceAlone() {
+        let daemon = makeDaemon()
+        daemon.reconcileInterfaceState()
         #expect(spy.recordedCalls.isEmpty)
     }
 
