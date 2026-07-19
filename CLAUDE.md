@@ -25,22 +25,24 @@ Run a single test by name with `swift test --filter <SuiteName>/<testName>` (e.g
 
 Two SwiftPM targets: the `geforcenow-awdl0` executable is a thin `ArgumentParser` entry point; all real logic lives in the `GFNAwdl0Lib` library so it can be unit-tested without launching the daemon.
 
-`Daemon` (an `actor`, `Sources/GFNAwdl0Lib/Daemon.swift`) is the orchestrator. It is intentionally driven from `@MainActor run()` because several of its dependencies require the main RunLoop:
+`Daemon` (a `@MainActor` class, `Sources/GFNAwdl0Lib/Daemon.swift`) is the orchestrator. It is main-actor bound because several of its dependencies require the main RunLoop:
 
 - `ProcessMonitor` — `NSWorkspace` notifications for GeForce NOW launch/terminate (bundle ID `com.nvidia.gfnpc.mall`). Main-actor only.
 - `InterfaceMonitor` — `SCDynamicStore` watching `State:/Network/Interface/awdl0/Link`; callbacks are delivered via a run-loop source added to `CFRunLoopGetMain()`.
-- `WindowMonitor` — polls `CGWindowListCopyWindowInfo` every 5s filtered to the GeForce NOW PID, and emits `.streaming` when a window's bounds match the main display within a 1px tolerance.
+- `WindowMonitor` — polls `CGWindowListCopyWindowInfo` every 5s filtered to the GeForce NOW PID, and emits `.streaming` when a window's bounds match any active display (from `CGGetActiveDisplayList`) within a 1px tolerance.
 - `InterfaceController` — brings `awdl0` up/down via `socket(AF_INET, SOCK_DGRAM)` + `ioctl(SIOCGIFFLAGS/SIOCSIFFLAGS)` on a manually-constructed `ifreq`.
 
-All three monitors expose `AsyncStream` APIs; `Daemon.run()` spawns a `Task` per stream and keeps the main RunLoop pumped via a `CFRunLoopRunInMode` loop guarded by `ShutdownSignal` (SIGTERM/SIGINT handled with `DispatchSourceSignal` after `signal(..., SIG_IGN)`). `WindowMonitor` is spawned/cancelled on process launch/terminate events, not at startup, and is keyed by `geforceNowPid` so stale tasks exit when a new PID arrives.
+All three monitors expose `AsyncStream` APIs; `Daemon.run()` spawns a `Task` per stream and then suspends on a checked continuation (`shutdownContinuation`) until SIGTERM/SIGINT, which are handled with `DispatchSourceSignal` on the main queue after `signal(..., SIG_IGN)`. There is no explicit run-loop pump: Swift's async main keeps the main run loop serviced, so run-loop sources and main-queue dispatch sources both fire (verified empirically). `WindowMonitor` is spawned/cancelled on process launch/terminate events, not at startup; task cancellation tears down the old monitor when a new PID arrives.
 
-State machine: `isStreaming` flips on `WindowEvent.streaming` → `bringDown()`, flips back on `.notStreaming` or process termination → `bringUp()`. `InterfaceEvent.stateChanged(isUp: true)` while `isStreaming` triggers an immediate re-`bringDown()` — this is the "macOS re-enabled `awdl0` mid-stream" recovery path.
+State machine: `isStreaming` flips on `WindowEvent.streaming` → `bringDown()`, flips back on `.notStreaming` or process termination → `bringUp()`. `InterfaceEvent.stateChanged(isUp: true)` while `isStreaming` triggers an immediate re-`bringDown()` — this is the "macOS re-enabled `awdl0` mid-stream" recovery path. On startup, `reconcileInterfaceState()` brings `awdl0` back up if a previous run crashed mid-stream and left it down (launchd's `KeepAlive` relaunches us).
+
+Testability: `Daemon.init(interfaceController:windowEvents:)` takes an `InterfaceControlling` (protocol over `InterfaceController`) and a window-event stream factory. `DaemonTests` drives the internal `handleProcessEvent`/`handleWindowEvent`/`handleInterfaceEvent`/`reconcileInterfaceState` methods directly against an `InterfaceControllerSpy` — no root, no real monitors.
 
 ### InterfaceController and hardcoded ioctl values
 
 Swift can't expand the C macros in `<sys/sockio.h>` because they depend on `struct ifreq` layout. `SIOCGIFFLAGS` (`0xc0206911`) and `SIOCSIFFLAGS` (`0x80206910`) are therefore reconstructed by the `ioc(_:_:_:_:)` helper in `InterfaceController.swift:48` and pinned in the test suite (`InterfaceControllerTests`). If you touch the encoding, update the tests — they're the canary for "did I compute the request code correctly". Values are stable across macOS versions.
 
-Interface names are capped at 15 chars (IFNAMSIZ − 1 for null terminator); `InterfaceController.init` rejects longer names.
+Interface names are capped at 15 UTF-8 bytes (IFNAMSIZ − 1 for null terminator); `InterfaceController.init` rejects longer names.
 
 ## Testing framework
 
