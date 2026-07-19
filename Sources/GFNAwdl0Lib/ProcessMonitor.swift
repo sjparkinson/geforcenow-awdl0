@@ -23,31 +23,32 @@ public struct ProcessMonitor: Sendable {
             let workspace = NSWorkspace.shared
             let center = workspace.notificationCenter
 
-            let launchObserver = center.addObserver(
-                forName: NSWorkspace.didLaunchApplicationNotification,
-                object: workspace,
-                queue: .main
-            ) { notification in
-                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      app.bundleIdentifier == Self.geforceNowBundleID else {
-                    return
+            func addObserver(
+                for name: Notification.Name,
+                message: Logger.Message,
+                event: @escaping (pid_t) -> ProcessEvent
+            ) -> NSObjectProtocol {
+                center.addObserver(forName: name, object: workspace, queue: .main) { notification in
+                    guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                          app.bundleIdentifier == Self.geforceNowBundleID else {
+                        return
+                    }
+                    logger.info(message, metadata: ["pid": "\(app.processIdentifier)"])
+                    continuation.yield(event(app.processIdentifier))
                 }
-                logger.info("GeForce NOW launched", metadata: ["pid": "\(app.processIdentifier)"])
-                continuation.yield(.launched(pid: app.processIdentifier))
             }
 
-            let terminateObserver = center.addObserver(
-                forName: NSWorkspace.didTerminateApplicationNotification,
-                object: workspace,
-                queue: .main
-            ) { notification in
-                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      app.bundleIdentifier == Self.geforceNowBundleID else {
-                    return
-                }
-                logger.info("GeForce NOW terminated", metadata: ["pid": "\(app.processIdentifier)"])
-                continuation.yield(.terminated(pid: app.processIdentifier))
-            }
+            let launchObserver = addObserver(
+                for: NSWorkspace.didLaunchApplicationNotification,
+                message: "GeForce NOW launched",
+                event: { .launched(pid: $0) }
+            )
+
+            let terminateObserver = addObserver(
+                for: NSWorkspace.didTerminateApplicationNotification,
+                message: "GeForce NOW terminated",
+                event: { .terminated(pid: $0) }
+            )
 
             // Check if GeForce NOW is already running
             if let app = workspace.runningApplications.first(where: {
