@@ -16,18 +16,36 @@ private final class ShutdownWaiter: @unchecked Sendable {
     }
 }
 
+/// Abstraction over interface control so the daemon's state machine can be
+/// tested without root privileges.
+public protocol InterfaceControlling: Sendable {
+    func bringUp() throws
+    func bringDown() throws
+}
+
+extension InterfaceController: InterfaceControlling {}
+
 /// The main daemon that orchestrates all monitors and the interface controller.
 @MainActor
 public final class Daemon {
     private let logger = Logger(label: "Daemon")
-    private let interfaceController: InterfaceController
+    private let interfaceController: any InterfaceControlling
+    private let windowEvents: (pid_t) -> AsyncStream<WindowEvent>
 
     private var geforceNowPid: pid_t?
     private var isStreaming = false
     private var windowMonitorTask: Task<Void, Never>?
 
-    public init() throws {
-        self.interfaceController = try InterfaceController()
+    public init(
+        interfaceController: any InterfaceControlling,
+        windowEvents: @escaping (pid_t) -> AsyncStream<WindowEvent> = { WindowMonitor(pid: $0).events() }
+    ) {
+        self.interfaceController = interfaceController
+        self.windowEvents = windowEvents
+    }
+
+    public convenience init() throws {
+        self.init(interfaceController: try InterfaceController())
     }
 
     /// Run the daemon (suspends until SIGTERM/SIGINT).
@@ -91,7 +109,7 @@ public final class Daemon {
         waiter.intSource = intSource
     }
 
-    private func handleProcessEvent(_ event: ProcessEvent) {
+    func handleProcessEvent(_ event: ProcessEvent) {
         switch event {
         case .launched(let pid):
             geforceNowPid = pid
@@ -99,8 +117,7 @@ public final class Daemon {
 
             windowMonitorTask?.cancel()
             windowMonitorTask = Task {
-                let windowMonitor = WindowMonitor(pid: pid)
-                for await windowEvent in windowMonitor.events() {
+                for await windowEvent in windowEvents(pid) {
                     guard !Task.isCancelled else { break }
                     self.handleWindowEvent(windowEvent)
                     if self.geforceNowPid != pid {
@@ -122,7 +139,7 @@ public final class Daemon {
         }
     }
 
-    private func handleWindowEvent(_ event: WindowEvent) {
+    func handleWindowEvent(_ event: WindowEvent) {
         switch event {
         case .streaming:
             guard !isStreaming else { return }
@@ -138,7 +155,7 @@ public final class Daemon {
         }
     }
 
-    private func handleInterfaceEvent(_ event: InterfaceEvent) {
+    func handleInterfaceEvent(_ event: InterfaceEvent) {
         switch event {
         case .stateChanged(let isUp):
             if isUp && isStreaming {

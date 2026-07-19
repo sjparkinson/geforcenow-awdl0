@@ -1,4 +1,5 @@
 import CoreGraphics
+import Synchronization
 import Testing
 @testable import GFNAwdl0Lib
 
@@ -188,11 +189,107 @@ struct InterfaceMonitorTests {
     }
 }
 
+/// Records bringUp/bringDown calls so tests can assert on the daemon's decisions.
+final class InterfaceControllerSpy: InterfaceControlling {
+    enum Call: Equatable {
+        case up
+        case down
+    }
+
+    private let calls = Mutex<[Call]>([])
+
+    var recordedCalls: [Call] {
+        calls.withLock { $0 }
+    }
+
+    func bringUp() throws {
+        calls.withLock { $0.append(.up) }
+    }
+
+    func bringDown() throws {
+        calls.withLock { $0.append(.down) }
+    }
+}
+
 @Suite("Daemon Tests")
+@MainActor
 struct DaemonTests {
-    @Test("Can create Daemon")
-    @MainActor
-    func canCreateDaemon() throws {
-        _ = try Daemon()
+    let spy = InterfaceControllerSpy()
+
+    func makeDaemon(windowEvents: @escaping (pid_t) -> AsyncStream<WindowEvent> = { _ in AsyncStream { _ in } }) -> Daemon {
+        Daemon(interfaceController: spy, windowEvents: windowEvents)
+    }
+
+    @Test("Streaming brings the interface down once")
+    func streamingBringsInterfaceDown() {
+        let daemon = makeDaemon()
+        daemon.handleWindowEvent(.streaming)
+        daemon.handleWindowEvent(.streaming)
+        #expect(spy.recordedCalls == [.down])
+    }
+
+    @Test("Streaming ending brings the interface back up")
+    func streamingEndingBringsInterfaceUp() {
+        let daemon = makeDaemon()
+        daemon.handleWindowEvent(.streaming)
+        daemon.handleWindowEvent(.notStreaming)
+        #expect(spy.recordedCalls == [.down, .up])
+    }
+
+    @Test("Not streaming while already up does nothing")
+    func notStreamingWhileUpIsIgnored() {
+        let daemon = makeDaemon()
+        daemon.handleWindowEvent(.notStreaming)
+        #expect(spy.recordedCalls.isEmpty)
+    }
+
+    @Test("Interface coming back up mid-stream is brought down again")
+    func interfaceUpDuringStreamingBroughtDownAgain() {
+        let daemon = makeDaemon()
+        daemon.handleWindowEvent(.streaming)
+        daemon.handleInterfaceEvent(.stateChanged(isUp: true))
+        #expect(spy.recordedCalls == [.down, .down])
+    }
+
+    @Test("Interface state changes while not streaming are ignored")
+    func interfaceUpWhileNotStreamingIsIgnored() {
+        let daemon = makeDaemon()
+        daemon.handleInterfaceEvent(.stateChanged(isUp: true))
+        daemon.handleInterfaceEvent(.stateChanged(isUp: false))
+        #expect(spy.recordedCalls.isEmpty)
+    }
+
+    @Test("Process termination during streaming restores the interface")
+    func terminationDuringStreamingRestoresInterface() {
+        let daemon = makeDaemon()
+        daemon.handleProcessEvent(.launched(pid: 42))
+        daemon.handleWindowEvent(.streaming)
+        daemon.handleProcessEvent(.terminated(pid: 42))
+        #expect(spy.recordedCalls == [.down, .up])
+    }
+
+    @Test("Process termination while not streaming leaves the interface alone")
+    func terminationWhileNotStreamingIsIgnored() {
+        let daemon = makeDaemon()
+        daemon.handleProcessEvent(.launched(pid: 42))
+        daemon.handleProcessEvent(.terminated(pid: 42))
+        #expect(spy.recordedCalls.isEmpty)
+    }
+
+    @Test("Launch spawns a window monitor whose events drive the interface")
+    func launchSpawnsWindowMonitor() async {
+        let (stream, continuation) = AsyncStream.makeStream(of: WindowEvent.self)
+        let daemon = makeDaemon(windowEvents: { _ in stream })
+
+        daemon.handleProcessEvent(.launched(pid: 42))
+        continuation.yield(.streaming)
+
+        var attempts = 0
+        while spy.recordedCalls.isEmpty && attempts < 1000 {
+            await Task.yield()
+            attempts += 1
+        }
+        #expect(spy.recordedCalls == [.down])
+        continuation.finish()
     }
 }
