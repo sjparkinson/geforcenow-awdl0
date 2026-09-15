@@ -12,17 +12,30 @@ permissions:
   attestations: write
   artifact-metadata: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Build
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
-      - name: Cache Swift packages
+      - name: Toolchain
+        run: swift --version
+
+      # Only the resolved dependency checkouts are cached. Build products are
+      # deliberately left out: the runner image moves between Xcode releases,
+      # and a stale .build from another toolchain fails to link.
+      - name: Cache Swift dependencies
         uses: actions/cache@v6
         with:
-          path: .build
+          path: |
+            .build/checkouts
+            .build/repositories
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-spm-
