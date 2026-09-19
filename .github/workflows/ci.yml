@@ -20,9 +20,6 @@ jobs:
     name: Build
     runs-on: macos-26
     timeout-minutes: 20
-    # Branch pushes are covered by the push event, so only run the pull_request
-    # event for forks, which the push event never sees.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - uses: actions/checkout@v7
 
@@ -65,7 +62,6 @@ jobs:
     name: Format
     runs-on: macos-26
     timeout-minutes: 10
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - uses: actions/checkout@v7
 
