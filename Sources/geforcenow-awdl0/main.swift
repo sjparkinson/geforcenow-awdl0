@@ -7,34 +7,27 @@ struct GFNAwdl0: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "geforcenow-awdl0",
         abstract: "Keep awdl0 down while playing GeForce NOW to prevent AirDrop/AirPlay latency.",
-        version: "2.0.0",
-        subcommands: [Run.self],
-        defaultSubcommand: Run.self
+        discussion: """
+            Normally started by launchd via `make install`. Logs go to standard error, \
+            which the LaunchAgent redirects to ~/Library/Logs/geforcenow-awdl0.log.
+
+            Bringing awdl0 down needs root, so the installed binary is setuid.
+            """
     )
 
     @Flag(name: .shortAndLong, help: "Enable verbose logging.")
     var verbose = false
-}
 
-extension GFNAwdl0 {
-    struct Run: AsyncParsableCommand {
-        static let configuration = CommandConfiguration(
-            abstract: "Run the daemon (typically invoked by launchd)."
-        )
-
-        @OptionGroup var options: GFNAwdl0
-
-        @MainActor
-        mutating func run() async throws {
-            let logLevel: Logger.Level = options.verbose ? .debug : .info
-            LoggingSystem.bootstrap { label in
-                var handler = StreamLogHandler.standardError(label: label)
-                handler.logLevel = logLevel
-                return handler
-            }
-
-            let daemon = try Daemon()
-            try await daemon.run()
+    @MainActor
+    mutating func run() async throws {
+        let logLevel: Logger.Level = verbose ? .debug : .info
+        LoggingSystem.bootstrap { label in
+            var handler = StreamLogHandler.standardError(label: label)
+            handler.logLevel = logLevel
+            return handler
         }
+
+        let daemon = try Daemon()
+        try await daemon.run()
     }
 }
