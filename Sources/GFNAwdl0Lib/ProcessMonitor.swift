@@ -41,13 +41,16 @@ public struct ProcessMonitor: Sendable {
                 }
             }
 
-            let launchObserver = addObserver(
+            // The observer tokens are only ever touched on the main actor, here and in
+            // onTermination below, but `any NSObjectProtocol` is not Sendable and the
+            // @Sendable onTermination closure captures them.
+            nonisolated(unsafe) let launchObserver = addObserver(
                 for: NSWorkspace.didLaunchApplicationNotification,
                 message: "GeForce NOW launched",
                 event: { .launched(pid: $0) }
             )
 
-            let terminateObserver = addObserver(
+            nonisolated(unsafe) let terminateObserver = addObserver(
                 for: NSWorkspace.didTerminateApplicationNotification,
                 message: "GeForce NOW terminated",
                 event: { .terminated(pid: $0) }
