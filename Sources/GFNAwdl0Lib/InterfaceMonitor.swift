@@ -45,25 +45,30 @@ public struct InterfaceMonitor: Sendable {
             copyDescription: nil
         )
 
-        guard let store = SCDynamicStoreCreate(
-            nil,
-            "geforcenow-awdl0" as CFString,
-            { store, changedKeys, info in
-                guard let info = info else { return }
-                let state = Unmanaged<StreamState>.fromOpaque(info).takeUnretainedValue()
+        guard
+            let store = SCDynamicStoreCreate(
+                nil,
+                "geforcenow-awdl0" as CFString,
+                { store, changedKeys, info in
+                    guard let info = info else { return }
+                    let state = Unmanaged<StreamState>.fromOpaque(info).takeUnretainedValue()
 
-                let key = "State:/Network/Interface/\(state.interfaceName)/Link" as CFString
-                if let value = SCDynamicStoreCopyValue(store, key) as? [String: Any],
-                   let active = value["Active"] as? Bool {
-                    state.logger.info("Interface state changed", metadata: [
-                        "interface": "\(state.interfaceName)",
-                        "active": "\(active)"
-                    ])
-                    state.continuation?.yield(.stateChanged(isUp: active))
-                }
-            },
-            &context
-        ) else {
+                    let key = "State:/Network/Interface/\(state.interfaceName)/Link" as CFString
+                    if let value = SCDynamicStoreCopyValue(store, key) as? [String: Any],
+                        let active = value["Active"] as? Bool
+                    {
+                        state.logger.info(
+                            "Interface state changed",
+                            metadata: [
+                                "interface": "\(state.interfaceName)",
+                                "active": "\(active)",
+                            ])
+                        state.continuation?.yield(.stateChanged(isUp: active))
+                    }
+                },
+                &context
+            )
+        else {
             throw InterfaceMonitorError.storeCreationFailed
         }
 
@@ -92,7 +97,8 @@ public struct InterfaceMonitor: Sendable {
                 }
                 state.store = nil
                 state.runLoopSource = nil
-                logger.debug("Stopped monitoring interface state", metadata: ["interface": "\(interfaceName)"])
+                logger.debug(
+                    "Stopped monitoring interface state", metadata: ["interface": "\(interfaceName)"])
             }
         }
     }

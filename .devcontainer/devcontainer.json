@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json
 {
 	"name": "Swift",
-	"image": "swift:6.2-noble",
+	"image": "swift:6.4-noble",
 	"features": {},
 	"customizations": {
 		"vscode": {

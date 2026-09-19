@@ -39,10 +39,12 @@ public struct WindowMonitor: Sendable {
                     let newState: WindowEvent = isFullscreen ? .streaming : .notStreaming
 
                     if newState != lastState {
-                        logger.info("Window state changed", metadata: [
-                            "pid": "\(pid)",
-                            "streaming": "\(isFullscreen)"
-                        ])
+                        logger.info(
+                            "Window state changed",
+                            metadata: [
+                                "pid": "\(pid)",
+                                "streaming": "\(isFullscreen)",
+                            ])
                         lastState = newState
                         continuation.yield(newState)
                     }
@@ -63,21 +65,26 @@ public struct WindowMonitor: Sendable {
         let displays = activeDisplayBounds()
 
         // CGWindowListCopyWindowInfo returns a CFArray of CFDictionary
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+        guard
+            let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)
+                as? [[String: Any]]
+        else {
             return false
         }
 
         for window in windowList {
             // Filter by process ID
             guard let ownerPID = window[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID == pid else {
+                ownerPID == pid
+            else {
                 continue
             }
 
             // Use CGRect(dictionaryRepresentation:) for cleaner bounds extraction
             // kCGWindowBounds contains a CFDictionary that CGRect can parse directly
             guard let boundsDict = window[kCGWindowBounds as String] as? NSDictionary as CFDictionary?,
-                  let windowBounds = CGRect(dictionaryRepresentation: boundsDict) else {
+                let windowBounds = CGRect(dictionaryRepresentation: boundsDict)
+            else {
                 continue
             }
 

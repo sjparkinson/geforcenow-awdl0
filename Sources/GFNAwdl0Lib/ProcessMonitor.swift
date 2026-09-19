@@ -1,4 +1,4 @@
-@preconcurrency import AppKit
+import AppKit
 import Logging
 
 /// Events emitted by the ProcessMonitor
@@ -29,8 +29,11 @@ public struct ProcessMonitor: Sendable {
                 event: @escaping @Sendable (pid_t) -> ProcessEvent
             ) -> NSObjectProtocol {
                 center.addObserver(forName: name, object: workspace, queue: .main) { notification in
-                    guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                          app.bundleIdentifier == Self.geforceNowBundleID else {
+                    guard
+                        let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                            as? NSRunningApplication,
+                        app.bundleIdentifier == Self.geforceNowBundleID
+                    else {
                         return
                     }
                     logger.info(message, metadata: ["pid": "\(app.processIdentifier)"])
@@ -38,13 +41,16 @@ public struct ProcessMonitor: Sendable {
                 }
             }
 
-            let launchObserver = addObserver(
+            // The observer tokens are only ever touched on the main actor, here and in
+            // onTermination below, but `any NSObjectProtocol` is not Sendable and the
+            // @Sendable onTermination closure captures them.
+            nonisolated(unsafe) let launchObserver = addObserver(
                 for: NSWorkspace.didLaunchApplicationNotification,
                 message: "GeForce NOW launched",
                 event: { .launched(pid: $0) }
             )
 
-            let terminateObserver = addObserver(
+            nonisolated(unsafe) let terminateObserver = addObserver(
                 for: NSWorkspace.didTerminateApplicationNotification,
                 message: "GeForce NOW terminated",
                 event: { .terminated(pid: $0) }

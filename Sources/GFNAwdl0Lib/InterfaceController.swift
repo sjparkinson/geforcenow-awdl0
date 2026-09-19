@@ -36,8 +36,8 @@ public enum InterfaceError: Error, CustomStringConvertible, Sendable {
 public final class InterfaceController: Sendable {
     // ioctl encoding constants from <sys/ioccom.h>
     // https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/ioccom.h
-    static let IOC_OUT: UInt = 0x40000000
-    static let IOC_IN: UInt = 0x80000000
+    static let IOC_OUT: UInt = 0x4000_0000
+    static let IOC_IN: UInt = 0x8000_0000
     static let IOC_INOUT: UInt = IOC_IN | IOC_OUT
     static let IOCPARM_MASK: UInt = 0x1fff
 
@@ -118,10 +118,12 @@ public final class InterfaceController: Sendable {
             throw InterfaceError.setInterfaceFlagsFailed(errno)
         }
 
-        logger.debug("Interface state changed", metadata: [
-            "interface": "\(interfaceName)",
-            "up": "\(up)"
-        ])
+        logger.debug(
+            "Interface state changed",
+            metadata: [
+                "interface": "\(interfaceName)",
+                "up": "\(up)",
+            ])
     }
 
     private func getInterfaceFlags() throws -> UInt16 {
