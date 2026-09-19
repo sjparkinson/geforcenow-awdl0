@@ -1,6 +1,7 @@
 import CoreGraphics
 import Synchronization
 import Testing
+
 @testable import GFNAwdl0Lib
 
 @Suite("WindowMonitor Tests")
@@ -60,9 +61,9 @@ struct InterfaceControllerTests {
     @Test("ioctl encoding constants match BSD values")
     func ioctlEncodingConstants() {
         // Verify the encoding constants from <sys/ioccom.h>
-        #expect(InterfaceController.IOC_OUT == 0x40000000)
-        #expect(InterfaceController.IOC_IN == 0x80000000)
-        #expect(InterfaceController.IOC_INOUT == 0xc0000000)
+        #expect(InterfaceController.IOC_OUT == 0x4000_0000)
+        #expect(InterfaceController.IOC_IN == 0x8000_0000)
+        #expect(InterfaceController.IOC_INOUT == 0xc000_0000)
         #expect(InterfaceController.IOCPARM_MASK == 0x1fff)
     }
 
@@ -172,7 +173,9 @@ final class InterfaceControllerSpy: InterfaceControlling {
 struct DaemonTests {
     let spy = InterfaceControllerSpy()
 
-    func makeDaemon(windowEvents: @escaping (pid_t) -> AsyncStream<WindowEvent> = { _ in AsyncStream { _ in } }) -> Daemon {
+    func makeDaemon(
+        windowEvents: @escaping (pid_t) -> AsyncStream<WindowEvent> = { _ in AsyncStream { _ in } }
+    ) -> Daemon {
         Daemon(interfaceController: spy, windowEvents: windowEvents)
     }
 

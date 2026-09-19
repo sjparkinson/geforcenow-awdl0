@@ -29,8 +29,11 @@ public struct ProcessMonitor: Sendable {
                 event: @escaping @Sendable (pid_t) -> ProcessEvent
             ) -> NSObjectProtocol {
                 center.addObserver(forName: name, object: workspace, queue: .main) { notification in
-                    guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                          app.bundleIdentifier == Self.geforceNowBundleID else {
+                    guard
+                        let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                            as? NSRunningApplication,
+                        app.bundleIdentifier == Self.geforceNowBundleID
+                    else {
                         return
                     }
                     logger.info(message, metadata: ["pid": "\(app.processIdentifier)"])
