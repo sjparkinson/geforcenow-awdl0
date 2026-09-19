@@ -1,0 +1,21 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "permissions": {
+    "allow": [
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(swift format:*)",
+      "Bash(make build)",
+      "Bash(make test)"
+    ],
+    "ask": [
+      "Bash(make install)",
+      "Bash(make uninstall)",
+      "Bash(launchctl:*)"
+    ]
+  }
+}
