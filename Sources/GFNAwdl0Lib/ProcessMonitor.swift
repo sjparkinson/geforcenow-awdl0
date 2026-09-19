@@ -1,4 +1,4 @@
-@preconcurrency import AppKit
+import AppKit
 import Logging
 
 /// Events emitted by the ProcessMonitor
