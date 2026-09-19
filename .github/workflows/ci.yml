@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -14,13 +13,16 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
     name: Build
     runs-on: macos-26
     timeout-minutes: 20
+    # Branch pushes are covered by the push event, so only run the pull_request
+    # event for forks, which the push event never sees.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - uses: actions/checkout@v7
 
@@ -47,12 +49,30 @@ jobs:
         run: swift test
 
       - name: Upload
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
         with:
           path: .build/release/geforcenow-awdl0
           archive: false
 
       - name: Attest
+        if: github.ref == 'refs/heads/main'
         uses: actions/attest@v4.2.2
         with:
           subject-path: .build/release/geforcenow-awdl0
+
+  format:
+    name: Format
+    runs-on: macos-26
+    timeout-minutes: 10
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - uses: actions/checkout@v7
+
+      # swift-format ships with the toolchain. Reformatting in place and asking
+      # git whether anything moved means a failure prints the exact diff to
+      # apply, rather than a list of line numbers.
+      - name: Check formatting
+        run: |
+          swift format --recursive --in-place Package.swift Sources Tests
+          git diff --exit-code
